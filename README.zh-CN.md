@@ -2,6 +2,8 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md)
 
+> **说明**：本 SDK 主要为个人自用封装。仓库中的绝大部分代码、工程规范与测试套件均由 **Gemini 3.8 Flash** 与 **Gemini 4 Argon** 生成。
+
 macOS 视觉素材管理软件 **Atlas** 的本地 MCP 客户端强类型 SDK。
 
 面向 **Bun 1.4+** 与 **TypeScript 7+** 开发，运行期零外部冗余依赖。
@@ -146,6 +148,12 @@ await client.switchLibrary({ path: "/Users/username/Pictures/工作.atlaslibrary
 - `openSettings(params)` / `open_settings`：打开设置窗口
 - `appInfo(params)` / `app_info`：获取软件版本与系统环境信息
 - `runMaintenance(params)` / `run_maintenance`：运行图库去重或缩略图修复维护任务
+
+### MCP 原生协议方法
+
+- `listTools()` / `list_tools()`：请求当前服务端实时注册的全部工具及其入参 JSON Schema。
+- `listResources()` / `list_resources()`：获取可用的 MCP 资源列表（如 `atlas://skill` 等）。
+- `readResource(uri)` / `read_resource(uri)`：按 URI 读取指定 MCP 资源的具体内容（文档文本或素材数据）。
 
 ---
 
