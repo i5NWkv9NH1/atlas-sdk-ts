@@ -20,6 +20,18 @@ export function normalizeParams(
     case "create_smart_folder":
     case "update_smart_folder":
       result.match ??= "";
+      if (Array.isArray(result.rules)) {
+        result.rules = (result.rules as Array<Record<string, unknown>>).map((rule) => {
+          if (rule && typeof rule === "object") {
+            const copy = { ...rule };
+            if (copy.unit === undefined || copy.unit === null) {
+              copy.unit = "";
+            }
+            return copy;
+          }
+          return rule;
+        });
+      }
       break;
 
     case "search_by_description":

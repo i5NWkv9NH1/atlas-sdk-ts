@@ -1,6 +1,6 @@
 {
   "name": "atlas-mcp",
-  "version": "0.1.0",
+  "version": "1.2.0",
   "description": "Strongly-typed local MCP SDK for Atlas on macOS (Unofficial)",
   "license": "MIT",
   "repository": {

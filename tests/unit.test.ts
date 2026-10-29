@@ -201,10 +201,21 @@ describe("Atlas TypeScript SDK Unit Tests", () => {
     expect(searchCall?.args.order).toBe("");
     expect(searchCall?.args.query).toBe("cat");
 
-    // 2. create_smart_folder should normalize match to ""
-    await client.createSmartFolder({ name: "Test", rules: [] });
+    // 2. create_smart_folder should normalize match to "" and rules unit to ""
+    await client.createSmartFolder({
+      name: "Test",
+      rules: [
+        {
+          field: "name",
+          op: "contains",
+          text: "test",
+        },
+      ],
+    });
     const sfCall = mock.callHistory.find((c) => c.name === "create_smart_folder");
     expect(sfCall?.args.match).toBe("");
+    const sfRules = sfCall?.args.rules as Array<{ unit?: string }>;
+    expect(sfRules[0]?.unit).toBe("");
 
     // 3. get_file should normalize size to 0
     await client.getFile({ item_id: "item-1" });
@@ -431,14 +442,17 @@ describe("Atlas TypeScript SDK Unit Tests", () => {
   // * ========================================================================
   // * 8. Compound Ingestion Builder (client.ingest())
   // * ========================================================================
-  test("Compound Ingestion: client.ingest() coordinates import, tags, metadata, and cleanup", async () => {
+  test("Compound Ingestion: client.ingest() coordinates import, tags, metadata, canvas coords, and cleanup", async () => {
     const mock = new MockAtlasTransport();
     let importedPath: string | undefined;
+    let importArgs: Record<string, unknown> | undefined;
 
     mock.mock("import_files", (args) => {
+      importArgs = args;
       importedPath = (args.paths as string[])[0];
       return { ok: true, item_ids: ["item-mock-ingest-123"] };
     });
+    mock.mock("add_to_collection", (args) => ({ ok: true, collection: args.collection }));
     mock.mock("add_tags", (args) => ({ ok: true, added: (args.tags as string[]).length }));
     mock.mock("set_metadata", () => ({ ok: true }));
     mock.mock("set_liked", () => ({ ok: true, liked: true }));
@@ -449,8 +463,10 @@ describe("Atlas TypeScript SDK Unit Tests", () => {
     const result = await client
       .ingest()
       .bytes(bytes, "png")
-      .filename("custom-name.png")
+      .filename("日/周_K线.png")
       .collection("Inbox")
+      .collection("Archive")
+      .canvasPosition(120, 240)
       .tags(["tag1", "tag2"])
       .annotation("Sample note")
       .sourceUrl("https://atlasformac.com")
@@ -458,20 +474,101 @@ describe("Atlas TypeScript SDK Unit Tests", () => {
       .send();
 
     expect(result.itemId).toBe("item-mock-ingest-123");
+    expect(result.itemIds).toEqual(["item-mock-ingest-123"]);
     expect(result.imported).toBe(true);
+    expect(result.skippedDuplicate).toBe(false);
+
+    // Verify canvas coordinates and primary collection forwarded to import_files
+    expect(importArgs?.x).toBe(120);
+    expect(importArgs?.y).toBe(240);
+    expect(importArgs?.collection).toBe("Inbox");
 
     // Verify all tools were called in order
     const calledNames = mock.callHistory.map((c) => c.name);
     expect(calledNames).toContain("import_files");
+    expect(calledNames).toContain("add_to_collection");
     expect(calledNames).toContain("add_tags");
     expect(calledNames).toContain("set_metadata");
     expect(calledNames).toContain("set_liked");
 
-    // Verify /tmp file was removed
+    // Verify /tmp file was sanitized and removed
     expect(importedPath).toBeTruthy();
+    expect(importedPath).toContain("日_周_K线.png");
     if (importedPath) {
       expect(await Bun.file(importedPath).exists()).toBe(false);
     }
+  });
+
+  test("Compound Ingestion: multi-item batch tagging and metadata propagation", async () => {
+    const mock = new MockAtlasTransport();
+    mock.mock("import_files", () => ({
+      ok: true,
+      imported: 2,
+      item_ids: ["item-batch-1", "item-batch-2"],
+    }));
+    mock.mock("add_tags", (args) => {
+      expect(args.item_ids).toEqual(["item-batch-1", "item-batch-2"]);
+      return { ok: true };
+    });
+    mock.mock("set_liked", (args) => {
+      expect(args.item_ids).toEqual(["item-batch-1", "item-batch-2"]);
+      return { ok: true, liked: true };
+    });
+    const metaCalls: string[] = [];
+    mock.mock("set_metadata", (args) => {
+      metaCalls.push(args.item_id as string);
+      return { ok: true };
+    });
+
+    const client = new AtlasClient({ transport: mock });
+    const res = await client
+      .ingest()
+      .filePaths(["/tmp/test1.png", "/tmp/test2.png"])
+      .tags(["tagA"])
+      .liked(true)
+      .annotation("Batch note")
+      .send();
+
+    expect(res.itemIds).toEqual(["item-batch-1", "item-batch-2"]);
+    expect(res.itemId).toBe("item-batch-1");
+    expect(metaCalls).toEqual(["item-batch-1", "item-batch-2"]);
+  });
+
+  test("Compound Ingestion: base64 data URI MIME auto-detection", async () => {
+    const mock = new MockAtlasTransport();
+    let importedFileName: string | undefined;
+    mock.mock("import_files", (args) => {
+      importedFileName = (args.paths as string[])[0]?.split("/").pop();
+      return { ok: true, item_ids: ["item-webp-1"] };
+    });
+    const client = new AtlasClient({ transport: mock });
+    await client
+      .ingest()
+      .base64("data:image/webp;base64,UklGRkAAAABXRUJQVlA4IDQAAADwAQCdASoBAAEAAQAcJaACdLoAAP7/2QAA")
+      .send();
+    expect(importedFileName).toMatch(/\.webp$/);
+  });
+
+  test("Compound Ingestion: throws AtlasToolError on failed items or unsupported format", async () => {
+    const mock = new MockAtlasTransport();
+    mock.mock("import_files", () => ({
+      ok: false,
+      imported: 0,
+      failed: [{ path: "/tmp/bad.mp4", reason: "AV1 decode failed" }],
+    }));
+    const client = new AtlasClient({ transport: mock });
+    expect(client.ingest().filePath("/tmp/bad.mp4").send()).rejects.toThrow("AV1 decode failed");
+
+    const mockUnsupported = new MockAtlasTransport();
+    mockUnsupported.mock("import_files", () => ({
+      ok: false,
+      imported: 0,
+      skipped_unsupported: 1,
+    }));
+    const clientUnsupported = new AtlasClient({ transport: mockUnsupported });
+    expect(clientUnsupported.ingest().filePath("/tmp/unknown.xyz").send()).rejects.toThrow(
+      "File format is unsupported by Atlas",
+    );
   });
 
   // * ========================================================================
