@@ -1,4 +1,4 @@
-# atlas-mcp
+# atlas-sdk
 
 [English](README.md) | [简体中文](README.zh-CN.md)
 
@@ -30,17 +30,17 @@ This package is not published to npm. You can install it directly from GitHub or
 ### Method 1: Install directly from GitHub
 
 ```bash
-bun add github:i5NWkv9NH1/atlas-mcp-ts
+bun add github:i5NWkv9NH1/atlas-sdk-ts
 ```
 
 ### Method 2: Local clone with `bun link` (recommended for local development)
 
 ```bash
-git clone https://github.com/i5NWkv9NH1/atlas-mcp-ts.git
+git clone https://github.com/i5NWkv9NH1/atlas-sdk-ts.git
 cd atlas-ts && bun install && bun link
 
 # In your project:
-bun link atlas-mcp
+bun link atlas-sdk
 ```
 
 ---
@@ -50,7 +50,7 @@ bun link atlas-mcp
 ### 1. Basic Ingestion and Search
 
 ```typescript
-import { AtlasClient } from "atlas-mcp";
+import { AtlasClient } from "atlas-sdk";
 
 // Automatically discovers active token and endpoint (http://127.0.0.1:50473/mcp)
 const client = new AtlasClient();
@@ -101,7 +101,7 @@ await client.switchLibrary({ path: "/Users/username/Pictures/Work.atlaslibrary" 
 Conveniently ingest images or media from raw bytes, base64 strings, file paths, or remote URLs while atomically assigning collections, tags, metadata, and favorite status in one call. Automatically manages and cleans up temporary files on disk.
 
 ```typescript
-import { AtlasClient } from "atlas-mcp";
+import { AtlasClient } from "atlas-sdk";
 
 const client = new AtlasClient();
 
@@ -197,7 +197,7 @@ console.log(`Ingested item ID: ${result.itemId}`);
 For fast, isolated testing without running the Atlas desktop application:
 
 ```typescript
-import { AtlasClient, MockAtlasTransport } from "atlas-mcp";
+import { AtlasClient, MockAtlasTransport } from "atlas-sdk";
 
 const mock = new MockAtlasTransport();
 const client = new AtlasClient({ transport: mock });

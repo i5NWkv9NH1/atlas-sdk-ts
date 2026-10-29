@@ -1,4 +1,4 @@
-# atlas-mcp
+# atlas-sdk
 
 [English](README.md) | [简体中文](README.zh-CN.md)
 
@@ -30,17 +30,17 @@ macOS 视觉素材管理软件 [**Atlas**](https://atlasformac.com/) 的本地 M
 ### 方式一：直接从 GitHub 安装
 
 ```bash
-bun add github:i5NWkv9NH1/atlas-mcp-ts
+bun add github:i5NWkv9NH1/atlas-sdk-ts
 ```
 
 ### 方式二：克隆到本地并通过 `bun link` 链接（推荐本机开发）
 
 ```bash
-git clone https://github.com/i5NWkv9NH1/atlas-mcp-ts.git
+git clone https://github.com/i5NWkv9NH1/atlas-sdk-ts.git
 cd atlas-ts && bun install && bun link
 
 # 在你的目标项目中链接：
-bun link atlas-mcp
+bun link atlas-sdk
 ```
 
 ---
@@ -50,7 +50,7 @@ bun link atlas-mcp
 ### 1. 基础连接与检索
 
 ```typescript
-import { AtlasClient } from "atlas-mcp";
+import { AtlasClient } from "atlas-sdk";
 
 // 自动探测本地运行中图库的 Token 与端点（http://127.0.0.1:50473/mcp）
 const client = new AtlasClient();
@@ -101,7 +101,7 @@ await client.switchLibrary({ path: "/Users/username/Pictures/工作.atlaslibrary
 通过链式调用一步完成图片或媒体的载入，支持二进制字节流、Base64 字符串、本地文件路径或网络媒体 URL，同时指定所属分类、标签、注释、来源与收藏状态，自动管理并清理临时文件：
 
 ```typescript
-import { AtlasClient } from "atlas-mcp";
+import { AtlasClient } from "atlas-sdk";
 
 const client = new AtlasClient();
 
@@ -197,7 +197,7 @@ console.log(`入库成功，素材 ID: ${result.itemId}`);
 无需启动 Atlas 软件即可进行脱机单元测试：
 
 ```typescript
-import { AtlasClient, MockAtlasTransport } from "atlas-mcp";
+import { AtlasClient, MockAtlasTransport } from "atlas-sdk";
 
 const mock = new MockAtlasTransport();
 const client = new AtlasClient({ transport: mock });
