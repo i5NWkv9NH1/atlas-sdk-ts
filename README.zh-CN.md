@@ -30,13 +30,13 @@ macOS 视觉素材管理软件 [**Atlas**](https://atlasformac.com/) 的本地 M
 ### 方式一：直接从 GitHub 安装
 
 ```bash
-bun add github:i5NWkv9NH1/atlas-ts
+bun add github:i5NWkv9NH1/atlas-mcp-ts
 ```
 
 ### 方式二：克隆到本地并通过 `bun link` 链接（推荐本机开发）
 
 ```bash
-git clone https://github.com/i5NWkv9NH1/atlas-ts.git
+git clone https://github.com/i5NWkv9NH1/atlas-mcp-ts.git
 cd atlas-ts && bun install && bun link
 
 # 在你的目标项目中链接：

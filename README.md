@@ -30,13 +30,13 @@ This package is not published to npm. You can install it directly from GitHub or
 ### Method 1: Install directly from GitHub
 
 ```bash
-bun add github:i5NWkv9NH1/atlas-ts
+bun add github:i5NWkv9NH1/atlas-mcp-ts
 ```
 
 ### Method 2: Local clone with `bun link` (recommended for local development)
 
 ```bash
-git clone https://github.com/i5NWkv9NH1/atlas-ts.git
+git clone https://github.com/i5NWkv9NH1/atlas-mcp-ts.git
 cd atlas-ts && bun install && bun link
 
 # In your project:
