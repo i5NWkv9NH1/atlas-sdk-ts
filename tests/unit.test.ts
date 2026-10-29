@@ -16,111 +16,23 @@ function toCamelCase(str: string): string {
   return str.replace(/_([a-z0-9])/g, (_, letter) => letter.toUpperCase());
 }
 
-// * Built-in list of all 78 official tools for standalone testing
-const BUILTIN_TOOL_NAMES: string[] = [
-  "library_info",
-  "list_libraries",
-  "list_collections",
-  "list_collection_folders",
-  "list_tags",
-  "list_smart_folders",
-  "list_connected_folders",
-  "search_items",
-  "run_smart_folder",
-  "get_item",
-  "view_items",
-  "get_file",
-  "get_board",
-  "find_similar",
-  "get_current_view",
-  "add_link",
-  "add_color",
-  "save_media_from_url",
-  "import_files",
-  "add_tags",
-  "remove_tags",
-  "set_tags",
-  "set_metadata",
-  "edit_link",
-  "edit_color",
-  "add_to_collection",
-  "remove_from_collection",
-  "set_liked",
-  "edit_image",
-  "refresh_thumbnail",
-  "trash_items",
-  "restore_items",
-  "create_collection",
-  "rename_collection",
-  "archive_collection",
-  "delete_collection",
-  "set_collection_order",
-  "move_collection_to_folder",
-  "create_collection_folder",
-  "move_collection_folder",
-  "rename_collection_folder",
-  "delete_collection_folder",
-  "create_smart_folder",
-  "update_smart_folder",
-  "delete_smart_folder",
-  "rename_tag",
-  "delete_tag",
-  "create_tag",
-  "create_tag_folder",
-  "rename_tag_folder",
-  "delete_tag_folder",
-  "move_tags_to_folder",
-  "arrange_board",
-  "move_to_group",
-  "move_group",
-  "reset_board_layout",
-  "undo_board_layout",
-  "connect_folder",
-  "disconnect_folder",
-  "rescan_folder",
-  "switch_library",
-  "create_library",
-  "search_by_description",
-  "store_embeddings",
-  "query_embeddings",
-  "show_in_app",
-  "show_items",
-  "open_item",
-  "select_items",
-  "set_view_mode",
-  "show_in_finder",
-  "get_settings",
-  "set_setting",
-  "open_settings",
-  "app_info",
-  "empty_trash",
-  "delete_permanently",
-  "run_maintenance",
-];
-
 describe("Atlas TypeScript SDK Unit Tests", () => {
   // * ========================================================================
   // * 1. Schema 100% Parity Alignment
   // * ========================================================================
   test("Schema 100% Parity: all 78 tools must be implemented on AtlasClient", async () => {
-    let tools: string[];
-    const schemaFile = Bun.file("../atlas-schema.json");
+    const fixturePath = new URL("./fixtures/atlas-schema.json", import.meta.url).pathname;
+    const schemaFile = Bun.file(fixturePath);
+    expect(await schemaFile.exists()).toBe(true);
 
-    if (await schemaFile.exists()) {
-      const schema = JSON.parse(await schemaFile.text()) as {
-        result?: { tools?: Array<{ name: string }> };
-        tools?: Array<{ name: string }>;
-      };
-      const schemaTools = schema.result?.tools || schema.tools || [];
-      expect(schemaTools.length).toBe(78);
-      tools = schemaTools.map((t) => t.name);
-    } else {
-      // * Fallback to built-in 78 tool names when running independently without repo root schema
-      tools = BUILTIN_TOOL_NAMES;
-    }
+    const schema = JSON.parse(await schemaFile.text()) as {
+      result?: { tools?: Array<{ name: string }> };
+      tools?: Array<{ name: string }>;
+    };
+    const schemaTools = schema.result?.tools || schema.tools || [];
+    expect(schemaTools.length).toBe(78);
 
-    expect(tools.length).toBe(78);
-
+    const tools = schemaTools.map((t) => t.name);
     const client = new AtlasClient({ transport: new MockAtlasTransport() });
     const clientRecord = client as unknown as Record<string, unknown>;
 
@@ -132,6 +44,14 @@ describe("Atlas TypeScript SDK Unit Tests", () => {
       // ! Check that idiomatic camelCase method exists
       expect(typeof clientRecord[camelName]).toBe("function");
     }
+
+    // ! Check that MCP protocol methods also exist
+    expect(typeof client.listTools).toBe("function");
+    expect(typeof client.list_tools).toBe("function");
+    expect(typeof client.listResources).toBe("function");
+    expect(typeof client.list_resources).toBe("function");
+    expect(typeof client.readResource).toBe("function");
+    expect(typeof client.read_resource).toBe("function");
   });
 
   // * ========================================================================
@@ -470,7 +390,46 @@ describe("Atlas TypeScript SDK Unit Tests", () => {
   });
 
   // * ========================================================================
-  // * 7. Secret Leak Prevention Scan
+  // * 7. MCP Protocol Methods (tools/list, resources/list, resources/read)
+  // * ========================================================================
+  test("MCP Protocol: listTools, listResources, and readResource mock handling", async () => {
+    const mock = new MockAtlasTransport();
+    mock.mockListTools(() => ({
+      tools: [{ name: "test_tool", description: "A test tool" }],
+    }));
+    mock.mockListResources(() => ({
+      resources: [{ uri: "atlas://skill", name: "Skill Doc" }],
+    }));
+    mock.mockReadResource((uri) => ({
+      contents: [{ uri, mimeType: "text/markdown", text: "# Skill Doc" }],
+    }));
+
+    const client = new AtlasClient({ transport: mock });
+
+    const tools = await client.listTools();
+    expect(tools.tools.length).toBe(1);
+    expect(tools.tools[0]?.name).toBe("test_tool");
+
+    const toolsSnake = await client.list_tools();
+    expect(toolsSnake.tools.length).toBe(1);
+
+    const resources = await client.listResources();
+    expect(resources.resources.length).toBe(1);
+    expect(resources.resources[0]?.uri).toBe("atlas://skill");
+
+    const resourcesSnake = await client.list_resources();
+    expect(resourcesSnake.resources.length).toBe(1);
+
+    const read = await client.readResource("atlas://skill");
+    expect(read.contents.length).toBe(1);
+    expect(read.contents[0]?.text).toBe("# Skill Doc");
+
+    const readSnake = await client.read_resource("atlas://skill");
+    expect(readSnake.contents.length).toBe(1);
+  });
+
+  // * ========================================================================
+  // * 8. Secret Leak Prevention Scan
   // * ========================================================================
   test("Secret Leak Prevention: scans src/ and tests/ for forbidden token leaks and runtime file violations", async () => {
     // Scan all .ts files in src/ and tests/

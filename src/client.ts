@@ -84,6 +84,9 @@ import type {
   ListSmartFoldersResult,
   ListTagsParams,
   ListTagsResult,
+  McpListResourcesResult,
+  McpListToolsResult,
+  McpReadResourceResult,
   MoveCollectionFolderParams,
   MoveCollectionFolderResult,
   MoveCollectionToFolderParams,
@@ -224,6 +227,49 @@ export class AtlasClient {
    */
   ping(): Promise<boolean> {
     return this.transport.ping();
+  }
+
+  // * ========================================================================
+  // * MCP Protocol Methods (tools/list, resources/list, resources/read)
+  // * ========================================================================
+
+  /**
+   * List available tools and their schemas from the Atlas MCP server.
+   */
+  listTools(): Promise<McpListToolsResult> {
+    return this.transport.listTools();
+  }
+  /**
+   * Alias for listTools (List available tools and their schemas from the Atlas MCP server.)
+   */
+  list_tools(): Promise<McpListToolsResult> {
+    return this.listTools();
+  }
+
+  /**
+   * List available resources from the Atlas MCP server.
+   */
+  listResources(): Promise<McpListResourcesResult> {
+    return this.transport.listResources();
+  }
+  /**
+   * Alias for listResources (List available resources from the Atlas MCP server.)
+   */
+  list_resources(): Promise<McpListResourcesResult> {
+    return this.listResources();
+  }
+
+  /**
+   * Read the content of an MCP resource by URI (e.g. atlas://skill or atlas://item/<id>).
+   */
+  readResource(uri: string): Promise<McpReadResourceResult> {
+    return this.transport.readResource(uri);
+  }
+  /**
+   * Alias for readResource (Read the content of an MCP resource by URI.)
+   */
+  read_resource(uri: string): Promise<McpReadResourceResult> {
+    return this.readResource(uri);
   }
 
   // * ========================================================================

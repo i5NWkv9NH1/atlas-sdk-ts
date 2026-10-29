@@ -2,7 +2,13 @@
 // * Provides HTTP communication, token auto-discovery, auto-launch, 401 retries, and offline mocking.
 
 import { normalizeParams } from "./normalize.js";
-import type { AtlasToolMap, AtlasToolName } from "./types.js";
+import type {
+  AtlasToolMap,
+  AtlasToolName,
+  McpListResourcesResult,
+  McpListToolsResult,
+  McpReadResourceResult,
+} from "./types.js";
 
 // * ============================================================================
 // * 1. Strongly-Typed Error Hierarchy
@@ -88,6 +94,21 @@ export interface AtlasTransport {
    * Call an arbitrary tool with weakly-typed payload.
    */
   callTool<T = unknown>(name: string, args?: Record<string, unknown>): Promise<T>;
+
+  /**
+   * Request the list of available tools and their schemas from the MCP server.
+   */
+  listTools(): Promise<McpListToolsResult>;
+
+  /**
+   * Request the list of available resources from the MCP server.
+   */
+  listResources(): Promise<McpListResourcesResult>;
+
+  /**
+   * Read the content of an MCP resource by URI.
+   */
+  readResource(uri: string): Promise<McpReadResourceResult>;
 
   /**
    * Health check ping to ensure server is reachable.
@@ -386,11 +407,57 @@ export class HttpAtlasTransport implements AtlasTransport {
    */
   async callTool(name: string, args: Record<string, unknown> = {}): Promise<unknown> {
     const normalizedArgs = normalizeParams(name, args);
+    const result = await this.executeRpcMethod<{
+      isError?: boolean;
+      content?: Array<{
+        type: "text" | "image";
+        text?: string;
+        data?: string;
+        mimeType?: string;
+      }>;
+    }>("tools/call", { name, arguments: normalizedArgs });
+
+    // ! Check tool execution business error
+    if (result.isError) {
+      const firstText = result.content?.[0]?.text || "Unknown Atlas tool error";
+      throw new AtlasToolError(name, firstText);
+    }
+
+    // * Unwrap MCP content payload
+    return this.unpackMcpContent(name, result.content);
+  }
+
+  /**
+   * Request the list of available tools and their schemas from the MCP server.
+   */
+  async listTools(): Promise<McpListToolsResult> {
+    return await this.executeRpcMethod<McpListToolsResult>("tools/list", {});
+  }
+
+  /**
+   * Request the list of available resources from the MCP server.
+   */
+  async listResources(): Promise<McpListResourcesResult> {
+    return await this.executeRpcMethod<McpListResourcesResult>("resources/list", {});
+  }
+
+  /**
+   * Read the content of an MCP resource by URI.
+   */
+  async readResource(uri: string): Promise<McpReadResourceResult> {
+    return await this.executeRpcMethod<McpReadResourceResult>("resources/read", { uri });
+  }
+
+  // * Execute a JSON-RPC method with auto-launch and 401 retry handling
+  private async executeRpcMethod<T>(
+    method: string,
+    params: Record<string, unknown> = {},
+  ): Promise<T> {
     const token = await this.tokenResolver.resolveToken();
 
     let response: Response;
     try {
-      response = await this.executeWithAutoLaunch(name, normalizedArgs, token);
+      response = await this.executeRpcWithAutoLaunch(method, params, token);
     } catch (err) {
       // ! Unreachable connection or network failure
       throw new AtlasConnectionError(
@@ -403,11 +470,7 @@ export class HttpAtlasTransport implements AtlasTransport {
       this.tokenResolver.clearCache();
       const refreshedToken = await this.tokenResolver.resolveToken(true);
 
-      const retryRes = await this.executeRawRpc(
-        "tools/call",
-        { name, arguments: normalizedArgs },
-        refreshedToken,
-      );
+      const retryRes = await this.executeRawRpc(method, params, refreshedToken);
 
       if (retryRes.status === 401) {
         throw new AtlasAuthError(
@@ -428,15 +491,7 @@ export class HttpAtlasTransport implements AtlasTransport {
       jsonrpc: string;
       id: number;
       error?: { code: number; message: string; data?: unknown };
-      result?: {
-        isError?: boolean;
-        content?: Array<{
-          type: "text" | "image";
-          text?: string;
-          data?: string;
-          mimeType?: string;
-        }>;
-      };
+      result?: T;
     };
 
     // ! Check top-level JSON-RPC protocol error
@@ -444,29 +499,17 @@ export class HttpAtlasTransport implements AtlasTransport {
       throw new AtlasRpcError(json.error.code, json.error.message, json.error.data);
     }
 
-    const result = json.result;
-    if (!result) {
-      return name === "view_items" ? { content: [] } : {};
-    }
-
-    // ! Check tool execution business error
-    if (result.isError) {
-      const firstText = result.content?.[0]?.text || "Unknown Atlas tool error";
-      throw new AtlasToolError(name, firstText);
-    }
-
-    // * Unwrap MCP content payload
-    return this.unpackMcpContent(name, result.content);
+    return (json.result ?? {}) as T;
   }
 
   // * Send request with automatic background app launch if connection is refused
-  private async executeWithAutoLaunch(
-    toolName: string,
-    args: Record<string, unknown>,
+  private async executeRpcWithAutoLaunch(
+    method: string,
+    params: Record<string, unknown>,
     token: string,
   ): Promise<Response> {
     try {
-      return await this.executeRawRpc("tools/call", { name: toolName, arguments: args }, token);
+      return await this.executeRawRpc(method, params, token);
     } catch (firstErr) {
       if (!this.autoLaunch) {
         throw firstErr;
@@ -476,7 +519,7 @@ export class HttpAtlasTransport implements AtlasTransport {
       await this.wakeAtlasApp(token);
 
       // * Retry the original request after successful wake-up
-      return await this.executeRawRpc("tools/call", { name: toolName, arguments: args }, token);
+      return await this.executeRawRpc(method, params, token);
     }
   }
 
@@ -620,6 +663,11 @@ export type MockHandler = (args: Record<string, unknown>) => Promise<unknown> | 
  */
 export class MockAtlasTransport implements AtlasTransport {
   private handlers = new Map<string, MockHandler>();
+  private toolsHandler?: () => Promise<McpListToolsResult> | McpListToolsResult;
+  private resourcesHandler?: () => Promise<McpListResourcesResult> | McpListResourcesResult;
+  private readResourceHandler?: (
+    uri: string,
+  ) => Promise<McpReadResourceResult> | McpReadResourceResult;
   public callHistory: Array<{ name: string; args: Record<string, unknown> }> = [];
 
   /**
@@ -644,10 +692,66 @@ export class MockAtlasTransport implements AtlasTransport {
   }
 
   /**
+   * Register a mock handler for listTools (tools/list).
+   */
+  mockListTools(handler: () => Promise<McpListToolsResult> | McpListToolsResult): this {
+    this.toolsHandler = handler;
+    return this;
+  }
+
+  /**
+   * Register a mock handler for listResources (resources/list).
+   */
+  mockListResources(handler: () => Promise<McpListResourcesResult> | McpListResourcesResult): this {
+    this.resourcesHandler = handler;
+    return this;
+  }
+
+  /**
+   * Register a mock handler for readResource (resources/read).
+   */
+  mockReadResource(
+    handler: (uri: string) => Promise<McpReadResourceResult> | McpReadResourceResult,
+  ): this {
+    this.readResourceHandler = handler;
+    return this;
+  }
+
+  /**
    * Mock ping handler.
    */
   async ping(): Promise<boolean> {
     return true;
+  }
+
+  /**
+   * Request the list of available tools from mock handler.
+   */
+  async listTools(): Promise<McpListToolsResult> {
+    if (this.toolsHandler) {
+      return await this.toolsHandler();
+    }
+    return { tools: [] };
+  }
+
+  /**
+   * Request the list of available resources from mock handler.
+   */
+  async listResources(): Promise<McpListResourcesResult> {
+    if (this.resourcesHandler) {
+      return await this.resourcesHandler();
+    }
+    return { resources: [] };
+  }
+
+  /**
+   * Read the content of an MCP resource from mock handler.
+   */
+  async readResource(uri: string): Promise<McpReadResourceResult> {
+    if (this.readResourceHandler) {
+      return await this.readResourceHandler(uri);
+    }
+    return { contents: [] };
   }
 
   /**

@@ -1950,3 +1950,65 @@ export interface AtlasToolMap {
  * Union type of all 78 supported Atlas tool names
  */
 export type AtlasToolName = keyof AtlasToolMap;
+
+// * ============================================================================
+// * MCP Native Protocol Types (tools/list, resources/list, resources/read)
+// * ============================================================================
+
+/**
+ * Definition of an individual MCP tool returned by tools/list.
+ */
+export interface McpToolDefinition {
+  name: string;
+  description?: string;
+  inputSchema?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+/**
+ * Response payload of tools/list JSON-RPC method.
+ */
+export interface McpListToolsResult {
+  tools: McpToolDefinition[];
+  nextCursor?: string;
+  [key: string]: unknown;
+}
+
+/**
+ * Definition of an MCP resource returned by resources/list.
+ */
+export interface McpResourceDefinition {
+  uri: string;
+  name?: string;
+  description?: string;
+  mimeType?: string;
+  [key: string]: unknown;
+}
+
+/**
+ * Response payload of resources/list JSON-RPC method.
+ */
+export interface McpListResourcesResult {
+  resources: McpResourceDefinition[];
+  nextCursor?: string;
+  [key: string]: unknown;
+}
+
+/**
+ * Content payload item returned by resources/read.
+ */
+export interface McpResourceContent {
+  uri: string;
+  mimeType?: string;
+  text?: string;
+  blob?: string;
+  [key: string]: unknown;
+}
+
+/**
+ * Response payload of resources/read JSON-RPC method.
+ */
+export interface McpReadResourceResult {
+  contents: McpResourceContent[];
+  [key: string]: unknown;
+}

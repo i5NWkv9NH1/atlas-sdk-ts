@@ -1,0 +1,1285 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "tools": [
+      {
+        "description": "Which library is open and its totals: name, path, read-only state, unique item counts by kind, trash size, tag \/ collection \/ smart folder \/ connected folder counts, how much of the library the visual-similarity index covers. Pass `include_bytes: true` to also total the originals on disk (walks every file — slow on big libraries).",
+        "name": "library_info",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "include_bytes": {
+              "type": "boolean",
+              "description": "Sum the size of every original (slow)"
+            }
+          }
+        }
+      },
+      {
+        "name": "list_libraries",
+        "description": "Every library Atlas knows on this Mac (the open one is marked). Use switch_library to open another.",
+        "inputSchema": { "properties": {}, "type": "object" }
+      },
+      {
+        "description": "List every collection (board) in the Atlas library: id, name, sidebar folder, item count. System collections (Inbox, Likes, Trash) are marked. Per-collection counts are PLACEMENTS, not unique items — one item can live in several collections, and links \/ connected-folder items live outside collections entirely — so never sum them. The `library` object carries the exact unique totals.",
+        "inputSchema": { "properties": {}, "type": "object" },
+        "name": "list_collections"
+      },
+      {
+        "name": "list_collection_folders",
+        "description": "Sidebar folders that group collections: id, name, the collections filed directly inside each, and — since folders nest — `parent_id` (null at the top level) and `path` (\"Parent ▸ Child\").",
+        "inputSchema": { "properties": {}, "type": "object" }
+      },
+      {
+        "inputSchema": { "properties": {}, "type": "object" },
+        "name": "list_tags",
+        "description": "List every tag in the library with how many items carry it. A tag filed in a sidebar tag folder carries `folder` (name) and `folder_id`; `tag_folders` lists the folders themselves with their member tags. Loose tags have no `folder`."
+      },
+      {
+        "name": "list_smart_folders",
+        "description": "List saved smart folders (rule-based live searches): id, name, match count, and their rules.",
+        "inputSchema": { "properties": {}, "type": "object" }
+      },
+      {
+        "name": "list_connected_folders",
+        "inputSchema": { "properties": {}, "type": "object" },
+        "description": "Folders on disk that Atlas watches (the sidebar's Folders section): id, name, path, whether it's mounted on this Mac, and how many library items come from it. The iPhone folder (iCloud) is included. Items from connected folders carry `connected_folder_id`."
+      },
+      {
+        "name": "search_items",
+        "description": "Search library items. All filters are optional and combine with AND. With NO filters, `total_matches` is the exact count of all non-trashed items in the library — use that for \"how many items\" questions. `query` matches name, link title\/description, tags, annotation, author, location, and source URL, case-insensitively — it reads METADATA only, so for \"find pictures of X\" use search_by_description, which matches what items actually show. Scope with `collection`, `collection_folder`, `smart_folder`, `connected_folder`, or `source` (instagram \/ x). Filter by kind, tags (all \/ any), format, size, dimensions, duration, orientation, liked, untagged, date ranges (ISO 8601). Sort by date_added (default), date_created, name, bytes, duration, width, height, or random. Trashed items are excluded unless you search `collection: \"Trash\"`. For library-wide totals (how many images \/ videos \/ items) library_info answers in one cheap call. Enum filters accept \"\" for \"no filter\"; 0 on an optional number also means \"not set\". Returns compact metadata; `verbose: true` adds paths, notes and file facts; use view_items to actually see items.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "smart_folder": {
+              "type": "string",
+              "description": "Smart folder id or name — only its matches"
+            },
+            "collection": {
+              "type": "string",
+              "description": "Collection id or name (\"Trash\" searches trashed items)"
+            },
+            "max_bytes": { "type": "integer" },
+            "created_after": {
+              "type": "string",
+              "description": "ISO 8601 — the media's own capture\/creation date"
+            },
+            "tags": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Items must carry every listed tag"
+            },
+            "min_width": { "type": "integer" },
+            "min_duration": { "type": "number", "description": "Seconds, videos only" },
+            "added_after": { "type": "string", "description": "ISO 8601 date\/time" },
+            "min_height": { "type": "integer" },
+            "max_duration": { "type": "number" },
+            "added_within_days": {
+              "type": "integer",
+              "description": "Only items added in the last N days"
+            },
+            "author": {
+              "type": "string",
+              "description": "Author field contains (case-insensitive)"
+            },
+            "sort": {
+              "enum": [
+                "",
+                "date_added",
+                "date_created",
+                "name",
+                "bytes",
+                "duration",
+                "width",
+                "height",
+                "random"
+              ],
+              "type": "string",
+              "description": "Default date_added. Pass \"\" (empty string) when not filtering by this."
+            },
+            "source": {
+              "type": "string",
+              "enum": ["", "instagram", "x"],
+              "description": "Items saved from that network. Pass \"\" (empty string) when not filtering by this."
+            },
+            "added_before": { "type": "string", "description": "ISO 8601 date\/time" },
+            "query": { "description": "Free-text filter", "type": "string" },
+            "max_width": { "type": "integer" },
+            "has_annotation": { "type": "boolean" },
+            "collection_folder": {
+              "description": "Collection folder id or name — every collection inside it",
+              "type": "string"
+            },
+            "orientation": {
+              "type": "string",
+              "enum": ["", "portrait", "landscape", "square"],
+              "description": "Pass \"\" (empty string) when not filtering by this."
+            },
+            "max_height": { "type": "integer" },
+            "connected_folder": {
+              "description": "Connected folder id or name — only items from it",
+              "type": "string"
+            },
+            "untagged": { "description": "Only items with no tags", "type": "boolean" },
+            "kind": {
+              "description": "Pass \"\" (empty string) when not filtering by this.",
+              "enum": ["", "image", "video", "gif", "link", "color"],
+              "type": "string"
+            },
+            "limit": { "type": "integer", "description": "Max results, default 50, max 200" },
+            "created_before": { "type": "string" },
+            "any_tags": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Items must carry at least one listed tag"
+            },
+            "format": {
+              "type": "string",
+              "description": "File extension, e.g. png, jpg, mp4, heic"
+            },
+            "min_bytes": { "type": "integer" },
+            "order": {
+              "type": "string",
+              "description": "Default desc (newest \/ largest first). Pass \"\" (empty string) when not filtering by this.",
+              "enum": ["", "desc", "asc"]
+            },
+            "offset": { "type": "integer" },
+            "liked": { "type": "boolean" },
+            "verbose": {
+              "description": "Full metadata per item (paths, notes, file facts)",
+              "type": "boolean"
+            }
+          }
+        }
+      },
+      {
+        "name": "run_smart_folder",
+        "inputSchema": {
+          "properties": {
+            "offset": { "type": "integer" },
+            "limit": { "type": "integer", "description": "Default 50, max 200" },
+            "smart_folder": { "description": "Smart folder id or name", "type": "string" }
+          },
+          "required": ["smart_folder"],
+          "type": "object"
+        },
+        "description": "The items a saved smart folder currently matches (newest first). Paged like search_items."
+      },
+      {
+        "inputSchema": {
+          "required": ["item_id"],
+          "type": "object",
+          "properties": { "item_id": { "type": "string" } }
+        },
+        "description": "Full metadata for one item by id, including which collections it belongs to.",
+        "name": "get_item"
+      },
+      {
+        "name": "view_items",
+        "description": "Look at items: returns each item's thumbnail as an image (preceded by a text line naming the item id) so you can see the actual content. Up to 20 items per call. `size` caps the longest edge in pixels (default 512, max 1024) — keep it small when scanning many items.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "size": {
+              "type": "integer",
+              "description": "Max pixel size of the longest edge (128–1024, default 512)"
+            },
+            "item_ids": { "items": { "type": "string" }, "type": "array" }
+          },
+          "required": ["item_ids"]
+        }
+      },
+      {
+        "name": "get_file",
+        "description": "Read an item's original file. Images come back as an image block (downscaled to `size` px on the long edge, default 2048, max 4096 — pass `size: 0` for the untouched bytes, any format); videos and other non-image files return their path, size, and MIME type (read them with a file tool — the path is local to this Mac). `page` picks a carousel slide (0 = cover). The same bytes are available as the MCP resource atlas:\/\/item\/<id>\/original.",
+        "inputSchema": {
+          "required": ["item_id"],
+          "type": "object",
+          "properties": {
+            "size": {
+              "description": "Max long-edge pixels for images; 0 = original bytes",
+              "type": "integer"
+            },
+            "item_id": { "type": "string" },
+            "page": { "type": "integer", "description": "Carousel page, 0-based (default 0)" }
+          }
+        }
+      },
+      {
+        "description": "A collection's canvas layout: its groups (spatial clusters) with positions and the ordered items inside each.",
+        "name": "get_board",
+        "inputSchema": {
+          "required": ["collection"],
+          "type": "object",
+          "properties": {
+            "collection": { "type": "string", "description": "Collection id or name" }
+          }
+        }
+      },
+      {
+        "description": "Find items visually similar to a given item, using on-device image embeddings (Apple Vision feature prints). Purely visual — no text understanding. The index builds in the background after launch; results note how much of the library is indexed.",
+        "name": "find_similar",
+        "inputSchema": {
+          "type": "object",
+          "required": ["item_id"],
+          "properties": {
+            "item_id": { "type": "string" },
+            "limit": { "description": "Max results, default 20, max 50", "type": "integer" }
+          }
+        }
+      },
+      {
+        "description": "What the user is looking at right now: the collection (if any), the items on screen (ids, newest-first is not implied — this is display order), and which are selected. Use it to act on \"these\" \/ \"the selected ones\".",
+        "inputSchema": {
+          "properties": {
+            "limit": { "description": "Max items to list, default 100, max 500", "type": "integer" }
+          },
+          "type": "object"
+        },
+        "name": "get_current_view"
+      },
+      {
+        "description": "Save a URL as a link card (no media download). Files it into the given collection, or just into the library.",
+        "inputSchema": {
+          "properties": {
+            "collection": { "type": "string", "description": "Optional collection id or name" },
+            "url": { "type": "string" }
+          },
+          "type": "object",
+          "required": ["url"]
+        },
+        "name": "add_link"
+      },
+      {
+        "name": "add_color",
+        "inputSchema": {
+          "required": ["hex"],
+          "type": "object",
+          "properties": {
+            "hex": { "type": "string" },
+            "collection": { "description": "Optional collection id or name", "type": "string" }
+          }
+        },
+        "description": "Save a HEX color as a color card (e.g. #FF6B35, also 3\/4\/8-digit forms)."
+      },
+      {
+        "name": "save_media_from_url",
+        "description": "Download the media behind a web URL and import it — a direct image\/video URL, or a social post (X\/Twitter, Instagram, Pinterest, …) whose photos and videos are fetched, every carousel slide included. Falls back to saving a link card for social posts with no downloadable media. Slow tool — it performs real downloads.",
+        "inputSchema": {
+          "properties": {
+            "url": { "type": "string" },
+            "collection": {
+              "type": "string",
+              "description": "Optional collection id or name; defaults to the Inbox"
+            }
+          },
+          "type": "object",
+          "required": ["url"]
+        }
+      },
+      {
+        "name": "import_files",
+        "description": "Import media files from absolute paths on this Mac into a collection (defaults to the Inbox). Files are copied into the library; originals are untouched. Returns how many were imported, skipped as duplicates (`skipped_duplicate`) or skipped as unsupported types, plus `failed` (path + reason) for files macOS couldn't read, such as AV1 or VP9 videos.",
+        "inputSchema": {
+          "required": ["paths"],
+          "type": "object",
+          "properties": {
+            "collection": { "description": "Optional collection id or name", "type": "string" },
+            "paths": { "items": { "type": "string" }, "type": "array" },
+            "y": { "type": "number" },
+            "x": {
+              "type": "number",
+              "description": "Optional canvas position (world coordinates) to place the imports at"
+            }
+          }
+        }
+      },
+      {
+        "inputSchema": {
+          "required": ["item_ids", "tags"],
+          "properties": {
+            "item_ids": { "type": "array", "items": { "type": "string" } },
+            "tags": { "items": { "type": "string" }, "type": "array" }
+          },
+          "type": "object"
+        },
+        "description": "Add one or more tags to a set of items (existing tags are kept; duplicates ignored). Batched: one library save regardless of item count.",
+        "name": "add_tags"
+      },
+      {
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "item_ids": { "items": { "type": "string" }, "type": "array" },
+            "tags": { "items": { "type": "string" }, "type": "array" }
+          },
+          "required": ["item_ids", "tags"]
+        },
+        "name": "remove_tags",
+        "description": "Remove one or more tags from a set of items (case-insensitive)."
+      },
+      {
+        "name": "set_tags",
+        "description": "Replace an item's tags wholesale (an empty array clears them). Use add_tags \/ remove_tags to edit incrementally across many items.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "item_id": { "type": "string" },
+            "tags": { "type": "array", "items": { "type": "string" } }
+          },
+          "required": ["item_id", "tags"]
+        }
+      },
+      {
+        "description": "Set an item's annotation (note), author, location, or source URL. Only the fields you pass change; pass an empty string to clear a field.",
+        "inputSchema": {
+          "required": ["item_id"],
+          "properties": {
+            "annotation": { "type": "string" },
+            "location": { "type": "string" },
+            "source_url": { "type": "string" },
+            "item_id": { "type": "string" },
+            "author": { "type": "string" }
+          },
+          "type": "object"
+        },
+        "name": "set_metadata"
+      },
+      {
+        "name": "edit_link",
+        "description": "Edit a link card's title, description, or URL. Only the fields you pass change; empty title\/description clear the field.",
+        "inputSchema": {
+          "required": ["item_id"],
+          "properties": {
+            "description": { "type": "string" },
+            "url": { "type": "string" },
+            "title": { "type": "string" },
+            "item_id": { "type": "string" }
+          },
+          "type": "object"
+        }
+      },
+      {
+        "description": "Change a color card's HEX value.",
+        "inputSchema": {
+          "required": ["item_id", "hex"],
+          "type": "object",
+          "properties": { "hex": { "type": "string" }, "item_id": { "type": "string" } }
+        },
+        "name": "edit_color"
+      },
+      {
+        "inputSchema": {
+          "properties": {
+            "move": { "type": "boolean", "description": "Move instead of add (default false)" },
+            "item_ids": { "items": { "type": "string" }, "type": "array" },
+            "collection": { "type": "string", "description": "Target collection id or name" }
+          },
+          "type": "object",
+          "required": ["item_ids", "collection"]
+        },
+        "name": "add_to_collection",
+        "description": "File items into a collection. By default items are added (kept everywhere they already are); pass move=true to move them out of the source collections instead."
+      },
+      {
+        "inputSchema": {
+          "type": "object",
+          "required": ["item_ids", "collection"],
+          "properties": {
+            "collection": { "type": "string", "description": "Collection id or name" },
+            "item_ids": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "description": "Take items out of one collection without trashing them. Items in no other collection are re-filed into the Inbox so nothing is lost.",
+        "name": "remove_from_collection"
+      },
+      {
+        "name": "set_liked",
+        "description": "Like or unlike items (membership in the Likes collection).",
+        "inputSchema": {
+          "required": ["item_ids", "liked"],
+          "properties": {
+            "liked": { "type": "boolean" },
+            "item_ids": { "type": "array", "items": { "type": "string" } }
+          },
+          "type": "object"
+        }
+      },
+      {
+        "name": "edit_image",
+        "description": "Crop or rotate images without touching the imported file (it is kept; `revert: true` puts it back). `rotate` turns the picture a quarter turn \"left\" or \"right\" on top of its current edit; `crop` replaces the kept region with a rectangle in the TURNED picture's unit square — x, y, width, height in 0…1, top-left origin — so {\"x\":0, \"y\":0, \"width\":1, \"height\":0.5} keeps the top half. Rotate and crop can be combined. Managed still images only: connected-folder files, vectors and animations are skipped. Returns each image's new pixel size.",
+        "inputSchema": {
+          "required": ["item_ids"],
+          "type": "object",
+          "properties": {
+            "item_ids": { "type": "array", "items": { "type": "string" } },
+            "crop": {
+              "type": "object",
+              "properties": {
+                "width": { "type": "number" },
+                "x": { "type": "number" },
+                "height": { "type": "number" },
+                "y": { "type": "number" }
+              },
+              "description": "The kept region of the turned picture, in 0…1 units"
+            },
+            "rotate": {
+              "description": "A quarter turn, applied before the crop",
+              "enum": ["left", "right"],
+              "type": "string"
+            },
+            "revert": {
+              "type": "boolean",
+              "description": "Back to the imported picture (ignores rotate \/ crop)"
+            }
+          }
+        }
+      },
+      {
+        "name": "refresh_thumbnail",
+        "inputSchema": {
+          "properties": { "item_ids": { "type": "array", "items": { "type": "string" } } },
+          "required": ["item_ids"],
+          "type": "object"
+        },
+        "description": "Regenerate the thumbnails of items whose files changed on disk (edited in another app, or a connected-folder file replaced), so tiles and the open item show the current picture. Links and colors have no thumbnail to refresh and are skipped."
+      },
+      {
+        "description": "Move items to the Trash. Recoverable — restore_items puts them back; nothing is permanently deleted by this tool.",
+        "name": "trash_items",
+        "inputSchema": {
+          "type": "object",
+          "properties": { "item_ids": { "type": "array", "items": { "type": "string" } } },
+          "required": ["item_ids"]
+        }
+      },
+      {
+        "inputSchema": {
+          "type": "object",
+          "properties": { "item_ids": { "type": "array", "items": { "type": "string" } } },
+          "required": ["item_ids"]
+        },
+        "name": "restore_items",
+        "description": "Restore trashed items — puts them back into the collections they were trashed from (Put Back). Find trashed items with search_items collection:\"Trash\"."
+      },
+      {
+        "inputSchema": {
+          "required": ["name"],
+          "properties": { "name": { "type": "string" } },
+          "type": "object"
+        },
+        "description": "Create a new collection (board). Returns its id.",
+        "name": "create_collection"
+      },
+      {
+        "name": "rename_collection",
+        "description": "Rename a collection (board). System collections (Inbox, Likes, Trash) can't be renamed.",
+        "inputSchema": {
+          "required": ["collection", "name"],
+          "type": "object",
+          "properties": {
+            "collection": { "type": "string", "description": "Collection id or name" },
+            "name": { "type": "string" }
+          }
+        }
+      },
+      {
+        "name": "archive_collection",
+        "inputSchema": {
+          "properties": {
+            "archived": { "type": "boolean", "description": "true = archive, false = unarchive" },
+            "collection": { "description": "Collection id or name", "type": "string" }
+          },
+          "required": ["collection", "archived"],
+          "type": "object"
+        },
+        "description": "Put a collection away (archived) or bring it back. Archived collections keep every item but leave the sidebar and the ⌘K palette; list_collections still shows them with `archived: true`."
+      },
+      {
+        "name": "delete_collection",
+        "description": "Delete a collection. By default its items are kept (re-filed into the Inbox if they're in no other collection). `delete_items: true` also removes items that live only in this collection — that is permanent and requires Settings ▸ Developers ▸ \"Allow permanent deletion\".",
+        "inputSchema": {
+          "required": ["collection"],
+          "type": "object",
+          "properties": {
+            "collection": { "description": "Collection id or name", "type": "string" },
+            "delete_items": {
+              "type": "boolean",
+              "description": "Also delete items only found here (default false)"
+            }
+          }
+        }
+      },
+      {
+        "description": "Reorder the user's collections in the sidebar. Pass every collection id in the wanted order; ids you leave out keep their relative order after the listed ones.",
+        "inputSchema": {
+          "required": ["collection_ids"],
+          "type": "object",
+          "properties": { "collection_ids": { "type": "array", "items": { "type": "string" } } }
+        },
+        "name": "set_collection_order"
+      },
+      {
+        "name": "move_collection_to_folder",
+        "description": "File a collection into a sidebar collection folder (nested folders included — pass a path like \"Projekte\/Clients\" to pick one by its parents), or pull it back to the top level (omit `folder`).",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "collection": { "description": "Collection id or name", "type": "string" },
+            "folder": {
+              "description": "Collection folder id, name or path (\"Parent\/Child\"); omit for top level",
+              "type": "string"
+            }
+          },
+          "required": ["collection"]
+        }
+      },
+      {
+        "name": "create_collection_folder",
+        "description": "Create a sidebar folder that groups collections — at the top level, or nested inside another folder (`parent`). Returns its id. Optionally file collections into it right away.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string" },
+            "parent": {
+              "description": "Folder id, name or path (\"Parent\/Child\") to nest the new folder inside; omit for top level",
+              "type": "string"
+            },
+            "collection_ids": {
+              "items": { "type": "string" },
+              "description": "Collections (ids or names) to file inside",
+              "type": "array"
+            }
+          },
+          "required": ["name"]
+        }
+      },
+      {
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "folder": {
+              "description": "Folder id, name or path (\"Parent\/Child\")",
+              "type": "string"
+            },
+            "parent": {
+              "type": "string",
+              "description": "Destination folder id, name or path; omit for top level"
+            }
+          },
+          "required": ["folder"]
+        },
+        "name": "move_collection_folder",
+        "description": "Nest a sidebar collection folder inside another folder, or move it back to the top level (omit `parent`). Everything inside it moves along. A folder can't go inside itself or one of its own folders."
+      },
+      {
+        "description": "Rename a sidebar collection folder.",
+        "name": "rename_collection_folder",
+        "inputSchema": {
+          "properties": {
+            "folder": { "type": "string", "description": "Folder id or name" },
+            "name": { "type": "string" }
+          },
+          "type": "object",
+          "required": ["folder", "name"]
+        }
+      },
+      {
+        "name": "delete_collection_folder",
+        "description": "Delete a sidebar collection folder, folders nested inside it included. Its collections move up to the folder above it (or the top level) — unless `delete_collections: true`, which deletes them too (their items are kept, re-filed into the Inbox where needed).",
+        "inputSchema": {
+          "type": "object",
+          "required": ["folder"],
+          "properties": {
+            "delete_collections": { "description": "Default false", "type": "boolean" },
+            "folder": { "description": "Folder id or name", "type": "string" }
+          }
+        }
+      },
+      {
+        "description": "Save a rule-based live search as a smart folder. `match` any\/all of the rules must be true (`expect: false` inverts the whole set). Rule format is the same one list_smart_folders returns under `definition.rules`, e.g. {\"field\":\"type\",\"op\":\"is\",\"text\":\"video\"}, {\"field\":\"tag\",\"op\":\"contains\",\"text\":\"logo\"}, {\"field\":\"dateAdded\",\"op\":\"inLast\",\"number\":7,\"unit\":\"days\"}, {\"field\":\"fileSize\",\"op\":\"greaterThan\",\"number\":5,\"unit\":\"MB\"}, {\"field\":\"collection\",\"op\":\"isIn\",\"refID\":\"<collection id>\"}.",
+        "name": "create_smart_folder",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "match": {
+              "type": "string",
+              "enum": ["", "any", "all"],
+              "description": "Default all. Pass \"\" (empty string) when not filtering by this."
+            },
+            "name": { "type": "string" },
+            "rules": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string",
+                    "description": "type: image\/video\/gif\/link\/color · orientation: portrait\/landscape\/square · liked: true\/false"
+                  },
+                  "op": {
+                    "enum": [
+                      "is",
+                      "isNot",
+                      "contains",
+                      "notContains",
+                      "startsWith",
+                      "endsWith",
+                      "greaterThan",
+                      "lessThan",
+                      "equals",
+                      "before",
+                      "after",
+                      "inLast",
+                      "hasAny",
+                      "hasNone",
+                      "isIn",
+                      "isNotIn"
+                    ],
+                    "type": "string"
+                  },
+                  "date": { "type": "string", "description": "ISO 8601" },
+                  "number": { "type": "number" },
+                  "unit": {
+                    "description": "Pass \"\" (empty string) when the rule needs no unit.",
+                    "type": "string",
+                    "enum": ["", "KB", "MB", "seconds", "minutes", "days", "weeks", "months"]
+                  },
+                  "field": {
+                    "type": "string",
+                    "enum": [
+                      "type",
+                      "name",
+                      "format",
+                      "fileSize",
+                      "width",
+                      "height",
+                      "orientation",
+                      "duration",
+                      "dateAdded",
+                      "dateCreated",
+                      "tag",
+                      "url",
+                      "liked",
+                      "collection",
+                      "sourceFolder"
+                    ]
+                  },
+                  "refID": { "type": "string", "description": "Collection or connected-folder id" }
+                },
+                "description": "One rule. `field` + `op` + a value: `text` for type\/name\/format\/orientation\/url\/tag, `number` (+ optional `unit`) for fileSize\/width\/height\/duration\/inLast, `date` (ISO 8601) for before\/after, `refID` (collection or connected-folder id) for collection\/sourceFolder.",
+                "required": ["field", "op"]
+              }
+            },
+            "expect": { "type": "boolean", "description": "Default true; false = NOT (rules)" }
+          },
+          "required": ["name", "rules"]
+        }
+      },
+      {
+        "name": "update_smart_folder",
+        "description": "Change a smart folder's name, match mode, expect flag, or rules (rules replace the whole set). Only the fields you pass change.",
+        "inputSchema": {
+          "required": ["smart_folder"],
+          "properties": {
+            "expect": { "type": "boolean" },
+            "rules": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string",
+                    "description": "type: image\/video\/gif\/link\/color · orientation: portrait\/landscape\/square · liked: true\/false"
+                  },
+                  "op": {
+                    "enum": [
+                      "is",
+                      "isNot",
+                      "contains",
+                      "notContains",
+                      "startsWith",
+                      "endsWith",
+                      "greaterThan",
+                      "lessThan",
+                      "equals",
+                      "before",
+                      "after",
+                      "inLast",
+                      "hasAny",
+                      "hasNone",
+                      "isIn",
+                      "isNotIn"
+                    ],
+                    "type": "string"
+                  },
+                  "date": { "type": "string", "description": "ISO 8601" },
+                  "number": { "type": "number" },
+                  "unit": {
+                    "description": "Pass \"\" (empty string) when the rule needs no unit.",
+                    "type": "string",
+                    "enum": ["", "KB", "MB", "seconds", "minutes", "days", "weeks", "months"]
+                  },
+                  "field": {
+                    "type": "string",
+                    "enum": [
+                      "type",
+                      "name",
+                      "format",
+                      "fileSize",
+                      "width",
+                      "height",
+                      "orientation",
+                      "duration",
+                      "dateAdded",
+                      "dateCreated",
+                      "tag",
+                      "url",
+                      "liked",
+                      "collection",
+                      "sourceFolder"
+                    ]
+                  },
+                  "refID": { "type": "string", "description": "Collection or connected-folder id" }
+                },
+                "description": "One rule. `field` + `op` + a value: `text` for type\/name\/format\/orientation\/url\/tag, `number` (+ optional `unit`) for fileSize\/width\/height\/duration\/inLast, `date` (ISO 8601) for before\/after, `refID` (collection or connected-folder id) for collection\/sourceFolder.",
+                "required": ["field", "op"]
+              }
+            },
+            "name": { "type": "string" },
+            "match": {
+              "enum": ["", "any", "all"],
+              "type": "string",
+              "description": "Pass \"\" (empty string) when not filtering by this."
+            },
+            "smart_folder": { "type": "string", "description": "Smart folder id or name" }
+          },
+          "type": "object"
+        }
+      },
+      {
+        "inputSchema": {
+          "properties": {
+            "smart_folder": { "description": "Smart folder id or name", "type": "string" }
+          },
+          "type": "object",
+          "required": ["smart_folder"]
+        },
+        "description": "Delete a smart folder (just the saved search — no items are touched).",
+        "name": "delete_smart_folder"
+      },
+      {
+        "description": "Rename a tag everywhere it's used (trashed items included). Renaming onto an existing tag merges the two.",
+        "inputSchema": {
+          "properties": {
+            "name": { "type": "string", "description": "The new spelling" },
+            "tag": { "type": "string" }
+          },
+          "type": "object",
+          "required": ["tag", "name"]
+        },
+        "name": "rename_tag"
+      },
+      {
+        "description": "Remove a tag from the library: strips it from every item carrying it (trashed ones too) and drops it from the tag list. Items themselves are untouched.",
+        "inputSchema": {
+          "type": "object",
+          "required": ["tag"],
+          "properties": { "tag": { "type": "string" } }
+        },
+        "name": "delete_tag"
+      },
+      {
+        "description": "Create an empty tag (shows in the Tags list with 0 items) so it exists before anything carries it. Tagging items with add_tags creates tags implicitly — this is only for preparing a vocabulary.",
+        "name": "create_tag",
+        "inputSchema": {
+          "required": ["name"],
+          "properties": { "name": { "type": "string" } },
+          "type": "object"
+        }
+      },
+      {
+        "inputSchema": {
+          "properties": {
+            "tags": {
+              "items": { "type": "string" },
+              "description": "Tags (names) to file inside",
+              "type": "array"
+            },
+            "name": { "type": "string" }
+          },
+          "required": ["name"],
+          "type": "object"
+        },
+        "name": "create_tag_folder",
+        "description": "Create a sidebar folder that groups tags (the Tags section nests them under it). Returns its id. Optionally file existing tags into it right away; a tag sits in one folder at a time."
+      },
+      {
+        "description": "Rename a sidebar tag folder.",
+        "name": "rename_tag_folder",
+        "inputSchema": {
+          "properties": {
+            "folder": { "description": "Tag folder id or name", "type": "string" },
+            "name": { "type": "string" }
+          },
+          "required": ["folder", "name"],
+          "type": "object"
+        }
+      },
+      {
+        "name": "delete_tag_folder",
+        "description": "Delete a sidebar tag folder. Its tags stay on every item and read as loose tags again — nothing is untagged.",
+        "inputSchema": {
+          "required": ["folder"],
+          "type": "object",
+          "properties": { "folder": { "type": "string", "description": "Tag folder id or name" } }
+        }
+      },
+      {
+        "inputSchema": {
+          "type": "object",
+          "required": ["tags"],
+          "properties": {
+            "tags": { "items": { "type": "string" }, "type": "array", "description": "Tag names" },
+            "folder": { "description": "Tag folder id or name; omit to unfile", "type": "string" }
+          }
+        },
+        "description": "File tags into a sidebar tag folder, or pull them back out to the loose list (omit `folder`). A tag sits in one folder at a time, so filing moves it out of any other folder.",
+        "name": "move_tags_to_folder"
+      },
+      {
+        "description": "Rearrange a collection's canvas: each entry creates a group of the given items at (x, y) world coordinates (groups flow their items in a cluster around their center; a spacing of ~400–800 units between group centers reads well). Items must already be in the collection; items not mentioned keep their current groups. The user can undo this from the canvas.",
+        "inputSchema": {
+          "properties": {
+            "collection": { "type": "string", "description": "Collection id or name" },
+            "groups": {
+              "items": {
+                "properties": {
+                  "item_ids": { "type": "array", "items": { "type": "string" } },
+                  "x": { "type": "number" },
+                  "y": { "type": "number" }
+                },
+                "type": "object",
+                "required": ["item_ids", "x", "y"]
+              },
+              "type": "array"
+            }
+          },
+          "required": ["collection", "groups"],
+          "type": "object"
+        },
+        "name": "arrange_board"
+      },
+      {
+        "name": "move_to_group",
+        "description": "Move items into an existing canvas group (from get_board) at a position in its order. Items leave whatever group they were in.",
+        "inputSchema": {
+          "properties": {
+            "item_ids": { "type": "array", "items": { "type": "string" } },
+            "group_id": { "type": "string" },
+            "index": {
+              "type": "integer",
+              "description": "Insert position inside the group (default: end)"
+            },
+            "collection": { "type": "string", "description": "Collection id or name" }
+          },
+          "type": "object",
+          "required": ["collection", "group_id", "item_ids"]
+        }
+      },
+      {
+        "name": "move_group",
+        "description": "Move a canvas group to new (x, y) world coordinates.",
+        "inputSchema": {
+          "required": ["collection", "group_id", "x", "y"],
+          "properties": {
+            "collection": { "description": "Collection id or name", "type": "string" },
+            "group_id": { "type": "string" },
+            "y": { "type": "number" },
+            "x": { "type": "number" }
+          },
+          "type": "object"
+        }
+      },
+      {
+        "inputSchema": {
+          "required": ["collection"],
+          "properties": {
+            "collection": { "description": "Collection id or name", "type": "string" }
+          },
+          "type": "object"
+        },
+        "name": "reset_board_layout",
+        "description": "Undo all hand arrangement on a board: every item back into one cluster at the origin, following the grid sort order again."
+      },
+      {
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "collection": { "type": "string", "description": "Collection id or name" },
+            "redo": { "type": "boolean", "description": "Redo instead of undo" }
+          },
+          "required": ["collection"]
+        },
+        "name": "undo_board_layout",
+        "description": "Step a board's layout back (or forward with `redo: true`) through its arrangement history — the same undo the canvas offers."
+      },
+      {
+        "name": "connect_folder",
+        "description": "Watch a folder on this Mac: its media shows up in the sidebar's Folders section and becomes searchable (files stay where they are). Scans it right away.",
+        "inputSchema": {
+          "properties": {
+            "path": { "description": "Absolute path to a directory", "type": "string" }
+          },
+          "type": "object",
+          "required": ["path"]
+        }
+      },
+      {
+        "name": "disconnect_folder",
+        "description": "Stop watching a connected folder. Files on disk are untouched; the folder's items leave the library, including their places in collections and the Trash. The iPhone folder can't be disconnected.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "folder": { "type": "string", "description": "Connected folder id or name" }
+          },
+          "required": ["folder"]
+        }
+      },
+      {
+        "name": "rescan_folder",
+        "description": "Re-index a connected folder now: picks up new files, drops ones deleted on disk. Returns the item count.",
+        "inputSchema": {
+          "properties": {
+            "folder": { "description": "Connected folder id or name", "type": "string" }
+          },
+          "type": "object",
+          "required": ["folder"]
+        }
+      },
+      {
+        "name": "switch_library",
+        "description": "Open another Atlas library (from list_libraries, or any path to a .atlaslibrary folder). The whole app switches — every later tool call sees that library.",
+        "inputSchema": {
+          "type": "object",
+          "properties": { "path": { "type": "string" } },
+          "required": ["path"]
+        }
+      },
+      {
+        "name": "create_library",
+        "description": "Create a new, empty Atlas library at a path (a folder ending in .atlaslibrary is created) and switch to it.",
+        "inputSchema": {
+          "type": "object",
+          "required": ["path"],
+          "properties": { "path": { "type": "string" } }
+        }
+      },
+      {
+        "inputSchema": {
+          "properties": {
+            "kind": {
+              "enum": ["", "image", "video", "gif", "link"],
+              "description": "Only items of this kind. Pass \"\" (empty string) when not filtering by this.",
+              "type": "string"
+            },
+            "min_score": {
+              "type": "number",
+              "description": "Drop hits below this cosine — default 0.04 (what in-app search uses); 0 means unset"
+            },
+            "collection": {
+              "type": "string",
+              "description": "Only items in this collection (id or name)"
+            },
+            "query": {
+              "description": "Plain-language description of what the item shows",
+              "type": "string"
+            },
+            "limit": { "type": "integer", "description": "Max results, default 30, max 100" }
+          },
+          "required": ["query"],
+          "type": "object"
+        },
+        "description": "Find items by what they SHOW, from a plain-language description — \"a red sports car at night\", \"hand-drawn arrow sketch\", \"brutalist concrete facade\". Atlas embeds the description on this Mac with the same model that indexed every thumbnail, and returns the closest items, best first, each with a cosine `score`. Reach for this whenever the request is about what's IN the picture rather than what it's called: search_items only matches names, tags, notes and URLs, so it misses everything nobody happened to label. Narrow with `kind` \/ `collection`. Colors and preview-less links are never indexed. Pass the ids to show_items to put the results on the user's screen. Needs Settings ▸ General ▸ \"Semantic search\" on; the first query after launch loads the text model and can take a few seconds.",
+        "name": "search_by_description"
+      },
+      {
+        "description": "Store semantic-embedding vectors for library items, keyed by `content_hash` (from search_items \/ get_item file facts). `model` names the embedding model that produced them (e.g. \"siglip2-base-patch16-256\") — vectors from different models don't mix, so storing under a new model id DISCARDS the previously stored index. Vectors are L2-normalized on the way in and persisted with the library. Send items in batches (max 1000 per call). Entries whose hash is unknown to the library are still stored (the item may sync in later); use `prune: true` on a final batch to drop vectors whose hash no longer matches any item.",
+        "inputSchema": {
+          "properties": {
+            "entries": {
+              "items": {
+                "properties": {
+                  "content_hash": { "type": "string" },
+                  "vector": { "items": { "type": "number" }, "type": "array" }
+                },
+                "required": ["content_hash", "vector"],
+                "type": "object"
+              },
+              "type": "array",
+              "description": "Vectors to store, keyed by the item's content_hash"
+            },
+            "prune": {
+              "type": "boolean",
+              "description": "Afterwards, drop stored vectors whose hash matches no current item"
+            },
+            "model": {
+              "type": "string",
+              "description": "Embedding model id these vectors came from"
+            }
+          },
+          "type": "object",
+          "required": ["model", "entries"]
+        },
+        "name": "store_embeddings"
+      },
+      {
+        "name": "query_embeddings",
+        "description": "Semantic search over the vectors stored with store_embeddings, for clients that bring their own model: pass a query vector (a text or image embedding from the SAME model) and get the closest items back, best first, scored by cosine similarity. To search Atlas's own on-device index from plain language — no model needed — use search_by_description instead. Trashed items are excluded. With no vector, returns index status only (model, count, dimension). Combine with select_items \/ show_in_app to surface the hits in the Atlas window.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "min_score": {
+              "type": "number",
+              "description": "Drop results whose cosine falls below this (model-specific scale)"
+            },
+            "limit": { "type": "integer", "description": "Max results, default 20, max 100" },
+            "vector": {
+              "type": "array",
+              "items": { "type": "number" },
+              "description": "Query embedding (same model + dimension as the stored vectors)"
+            },
+            "model": {
+              "description": "Embedding model id the query vector came from",
+              "type": "string"
+            }
+          }
+        }
+      },
+      {
+        "description": "Navigate Atlas's window to a destination: a collection, collection folder, tag, smart folder, connected folder, or one of the built-in views (`all`, `links`, `colors`, `instagram`, `x`, `inbox`, `likes`, `trash`). Pass exactly one of `collection`, `collection_folder`, `tag`, `smart_folder`, `connected_folder`, or `view`. Brings the app to the front unless `front: false`. To show a set of individual items instead — search results, your own picks — use show_items.",
+        "name": "show_in_app",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "front": {
+              "description": "Bring Atlas to the front (default true)",
+              "type": "boolean"
+            },
+            "collection_folder": {
+              "type": "string",
+              "description": "Collection folder id or name"
+            },
+            "collection": { "type": "string", "description": "Collection id or name" },
+            "tag": { "type": "string" },
+            "view": {
+              "enum": ["", "all", "links", "colors", "instagram", "x", "inbox", "likes", "trash"],
+              "type": "string",
+              "description": "Pass \"\" (empty string) when not filtering by this."
+            },
+            "connected_folder": { "type": "string", "description": "Connected folder id or name" },
+            "smart_folder": { "type": "string", "description": "Smart folder id or name" }
+          }
+        }
+      },
+      {
+        "description": "Put an arbitrary set of items on screen: the same results view in-app search and Find Similar use — grid, in the order you pass them, with a Back button to wherever the user was. This is how you show a result set that matches no collection (search hits, a filtered subset, the ones you picked); show_in_app only navigates to a whole collection, tag, smart folder, or built-in view. `title` names the set in the header — pass what you searched for. `select: true` also selects them so the user can act on them right away. Up to 500 items; trashed ones are skipped.",
+        "name": "show_items",
+        "inputSchema": {
+          "properties": {
+            "front": {
+              "description": "Bring Atlas to the front (default true)",
+              "type": "boolean"
+            },
+            "item_ids": {
+              "items": { "type": "string" },
+              "type": "array",
+              "description": "Items to show, in the order they should appear"
+            },
+            "title": {
+              "description": "What to call this set in the header, e.g. the query behind it",
+              "type": "string"
+            },
+            "select": { "type": "boolean", "description": "Also select the items (default false)" }
+          },
+          "required": ["item_ids"],
+          "type": "object"
+        }
+      },
+      {
+        "inputSchema": {
+          "required": ["item_id"],
+          "properties": {
+            "collection": {
+              "description": "Collection (id or name) to show it in",
+              "type": "string"
+            },
+            "item_id": { "type": "string" },
+            "front": { "type": "boolean", "description": "Bring Atlas to the front (default true)" }
+          },
+          "type": "object"
+        },
+        "name": "open_item",
+        "description": "Open an item in Atlas's focused (full-size) view so the user sees it. Navigates to the item's collection first unless it's already on screen (pass `collection` to pick which one). Links open in the browser and color cards search the library by their color instead — that's what opening them means in Atlas."
+      },
+      {
+        "inputSchema": {
+          "required": ["item_ids"],
+          "type": "object",
+          "properties": {
+            "front": {
+              "description": "Bring Atlas to the front (default true)",
+              "type": "boolean"
+            },
+            "item_ids": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "name": "select_items",
+        "description": "Select items in the current grid\/canvas view (replacing the selection) so the user can act on them. Items not on screen are ignored — land on them first: show_in_app for a whole collection, show_items for a set of your own (which can select them in the same call)."
+      },
+      {
+        "description": "Switch the current view between its display modes: `grid` (packed rows), `infinite` (endless zoomable plane), and `canvas` (free-form board). Some destinations are grid-only (Trash, smart folders, tags, sources, connected folders, Links, Colors) and All Items has no canvas — the result reports the mode actually in effect.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "mode": { "type": "string", "enum": ["grid", "infinite", "canvas"] },
+            "front": { "type": "boolean", "description": "Bring Atlas to the front (default true)" }
+          },
+          "required": ["mode"]
+        },
+        "name": "set_view_mode"
+      },
+      {
+        "name": "show_in_finder",
+        "inputSchema": {
+          "type": "object",
+          "properties": { "item_ids": { "type": "array", "items": { "type": "string" } } },
+          "required": ["item_ids"]
+        },
+        "description": "Reveal items' original files in the Finder (up to 50)."
+      },
+      {
+        "name": "get_settings",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "section": {
+              "enum": [
+                "",
+                "appearance",
+                "behavior",
+                "general",
+                "services",
+                "sidebar",
+                "updates",
+                "mcp",
+                "debug"
+              ],
+              "type": "string",
+              "description": "Only this section. Pass \"\" (empty string) when not filtering by this."
+            }
+          }
+        },
+        "description": "Every user-tweakable app setting with its current value, type, and allowed values or range: appearance (light\/dark, window style, backgrounds, tile radius\/spacing, selection color), behavior (open\/hover\/playback, sort orders), general, sidebar visibility, download services, update channels, MCP, and — while the Debug tab is unlocked — every Debug knob. Change them with set_setting."
+      },
+      {
+        "name": "set_setting",
+        "description": "Change one app setting by name (from get_settings) — validated, applied live, and persisted, the same paths the Settings window drives. Numbers are clamped to their range. The MCP safety gates (mcp_enabled, allow_permanent_deletion, debug_unlocked) are read-only for agents; Debug knobs need the Debug tab unlocked.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "value": {
+              "type": ["string", "number", "boolean"],
+              "description": "The new value; booleans also accept \"true\"\/\"false\", numbers accept digit strings"
+            },
+            "name": { "type": "string", "description": "Setting name from get_settings" }
+          },
+          "required": ["name", "value"]
+        }
+      },
+      {
+        "inputSchema": {
+          "properties": {
+            "page": {
+              "description": "Pass \"\" (empty string) when not filtering by this.",
+              "type": "string",
+              "enum": [
+                "",
+                "general",
+                "appearance",
+                "shortcuts",
+                "collections",
+                "importing",
+                "media",
+                "galleries",
+                "services",
+                "extensions",
+                "mcp",
+                "updates",
+                "license",
+                "about",
+                "experimental",
+                "debug",
+                "library",
+                "developers"
+              ]
+            }
+          },
+          "type": "object"
+        },
+        "name": "open_settings",
+        "description": "Open Atlas's Settings window, optionally on a specific page. The license page only exists while licensing is active and the debug page while it's unlocked."
+      },
+      {
+        "description": "Facts about the running app: version, build, release channel (an `a` version suffix = internal alpha, `b` = beta, plain = stable), update-channel toggles, macOS version, MCP endpoint, and the open library.",
+        "name": "app_info",
+        "inputSchema": { "type": "object", "properties": {} }
+      },
+      {
+        "name": "empty_trash",
+        "description": "Permanently delete everything in the Trash. Irreversible (a metadata snapshot is kept, the files are not). Requires Settings ▸ Developers ▸ \"Allow permanent deletion\".",
+        "inputSchema": {
+          "type": "object",
+          "properties": { "confirm": { "description": "Must be true", "type": "boolean" } },
+          "required": ["confirm"]
+        }
+      },
+      {
+        "description": "Permanently delete items that are already in the Trash. Irreversible. Requires Settings ▸ Developers ▸ \"Allow permanent deletion\". Items not in the Trash are skipped — trash_items them first.",
+        "name": "delete_permanently",
+        "inputSchema": {
+          "properties": {
+            "confirm": { "description": "Must be true", "type": "boolean" },
+            "item_ids": { "items": { "type": "string" }, "type": "array" }
+          },
+          "required": ["item_ids", "confirm"],
+          "type": "object"
+        }
+      },
+      {
+        "name": "run_maintenance",
+        "inputSchema": {
+          "required": ["action"],
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "enum": [
+                "remove_duplicates",
+                "remove_missing_originals",
+                "purge_expired_trash",
+                "repair_thumbnails"
+              ]
+            },
+            "days": {
+              "type": "integer",
+              "description": "purge_expired_trash: delete items trashed more than N days ago (default 30)"
+            }
+          }
+        },
+        "description": "Library housekeeping. `remove_duplicates` runs File ▸ Clean up library: byte-identical files collapse onto one stored copy, a collection holding several keeps one entry (an item left in no collection goes to the Trash), and every other copy stays in place as a virtual copy, deleting the freed files; `remove_missing_originals` forgets items whose files are gone from disk; `purge_expired_trash` deletes trashed items older than `days`. Those three are permanent and require Settings ▸ Developers ▸ \"Allow permanent deletion\". `repair_thumbnails` regenerates missing previews and is always allowed."
+      }
+    ]
+  }
+}

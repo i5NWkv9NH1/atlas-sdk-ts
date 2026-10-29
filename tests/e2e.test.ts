@@ -84,7 +84,36 @@ describe("Atlas TypeScript SDK Live E2E Tests (Non-Destructive)", () => {
   });
 
   // * ========================================================================
-  // * 2. Isolated Temporary Ingestion, Mutation, and Teardown Verification
+  // * 2. Live Schema Parity & Skill Resource
+  // * ========================================================================
+  test("Live Schema Parity & Skill Resource: server reports 78 tools and non-empty atlas://skill", async () => {
+    expect(isServerRunning).toBe(true);
+
+    // 1. List tools and assert all 78 live tools are implemented on client
+    const toolsRes = await client.listTools();
+    expect(Array.isArray(toolsRes.tools)).toBe(true);
+    expect(toolsRes.tools.length).toBe(78);
+
+    const clientRecord = client as unknown as Record<string, unknown>;
+    for (const tool of toolsRes.tools) {
+      const snakeName = tool.name;
+      const camelName = snakeName.replace(/_([a-z0-9])/g, (_, letter) => letter.toUpperCase());
+      expect(typeof clientRecord[snakeName]).toBe("function");
+      expect(typeof clientRecord[camelName]).toBe("function");
+    }
+
+    // 2. Read official skill resource
+    const skillRes = await client.readResource("atlas://skill");
+    expect(Array.isArray(skillRes.contents)).toBe(true);
+    expect(skillRes.contents.length).toBeGreaterThan(0);
+    const skillDoc = skillRes.contents[0];
+    expect(skillDoc?.uri).toBe("atlas://skill");
+    expect(typeof skillDoc?.text).toBe("string");
+    expect((skillDoc?.text ?? "").length).toBeGreaterThan(50);
+  });
+
+  // * ========================================================================
+  // * 3. Isolated Temporary Ingestion, Mutation, and Teardown Verification
   // * ========================================================================
   test("Isolated Temporary Ingestion: imports /tmp test PNG, mutates metadata/tags, and trashes", async () => {
     expect(isServerRunning).toBe(true);
