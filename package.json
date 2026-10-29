@@ -3,6 +3,10 @@
   "version": "0.1.0",
   "description": "Strongly-typed local MCP SDK for Atlas on macOS (Unofficial)",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/i5NWkv9NH1/atlas-ts.git"
+  },
   "files": [
     "src",
     "README.md",

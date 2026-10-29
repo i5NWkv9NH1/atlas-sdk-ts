@@ -4,7 +4,7 @@
 
 > **说明**：本 SDK 主要为个人自用封装。仓库中的绝大部分代码、工程规范与测试套件均由 **Gemini 3.8 Flash** 与 **Gemini 4 Argon** 生成。
 
-macOS 视觉素材管理软件 **Atlas** 的本地 MCP 客户端强类型 SDK（第三方非官方实现）。
+macOS 视觉素材管理软件 [**Atlas**](https://atlasformac.com/) 的本地 MCP 客户端强类型 SDK（第三方非官方实现）。
 
 面向 **Bun 1.4+** 与 **TypeScript 7+** 开发，运行期零外部冗余依赖。
 
@@ -24,15 +24,22 @@ macOS 视觉素材管理软件 **Atlas** 的本地 MCP 客户端强类型 SDK（
 
 ## 安装
 
+本包不发布至 NPM 镜像源，支持直接从 GitHub 仓库引用或通过本地路径链接使用：
+
+### 方式一：直接从 GitHub 安装
+
 ```bash
-bun add @sora/atlas
+bun add github:i5NWkv9NH1/atlas-ts
 ```
 
-在本地开发环境中建立软链接：
+### 方式二：克隆到本地并通过 `bun link` 链接（推荐本机开发）
 
 ```bash
-cd atlas-ts
-bun link
+git clone https://github.com/i5NWkv9NH1/atlas-ts.git
+cd atlas-ts && bun install && bun link
+
+# 在你的目标项目中链接：
+bun link @sora/atlas
 ```
 
 ---
