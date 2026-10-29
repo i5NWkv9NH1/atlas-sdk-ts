@@ -1,4 +1,4 @@
-# @sora/atlas
+# atlas-mcp
 
 [English](README.md) | [简体中文](README.zh-CN.md)
 
@@ -13,6 +13,7 @@ Built for **Bun 1.4+** and **TypeScript 7+**, with zero external runtime depende
 ## Highlights
 
 - **100% Tool Coverage**: Complete, type-safe implementations of all 78 tools from the official Atlas MCP schema.
+- **Fluent Compound Ingestion**: High-level `client.ingest()` builder to import binary bytes, base64 data, file paths, or remote URLs with metadata and tags in one chained call.
 - **Dual Calling Convention**: Every tool is accessible via both idiomatic `camelCase` (`client.searchItems(...)`) and original `snake_case` (`client.search_items(...)`).
 - **Multi-Library Token Switching**: Automatically discovers `.mcp-token` from the active library, reads tokens via `atlas status`, and supports library-specific token routing.
 - **Fault-Tolerant Transport**: Automatic macOS background launch (`open -g -a Atlas`) on connection refusal and transparent single retry on `HTTP 401 Unauthorized`.
@@ -39,7 +40,7 @@ git clone https://github.com/i5NWkv9NH1/atlas-ts.git
 cd atlas-ts && bun install && bun link
 
 # In your project:
-bun link @sora/atlas
+bun link atlas-mcp
 ```
 
 ---
@@ -49,7 +50,7 @@ bun link @sora/atlas
 ### 1. Basic Ingestion and Search
 
 ```typescript
-import { AtlasClient } from "@sora/atlas";
+import { AtlasClient } from "atlas-mcp";
 
 // Automatically discovers active token and endpoint (http://127.0.0.1:50473/mcp)
 const client = new AtlasClient();
@@ -93,6 +94,33 @@ const client = new AtlasClient({
 
 // Switch active library
 await client.switchLibrary({ path: "/Users/username/Pictures/Work.atlaslibrary" });
+```
+
+### 3. One-Shot Media Ingestion (`client.ingest()`)
+
+Conveniently ingest images or media from raw bytes, base64 strings, file paths, or remote URLs while atomically assigning collections, tags, metadata, and favorite status in one call. Automatically manages and cleans up temporary files on disk.
+
+```typescript
+import { AtlasClient } from "atlas-mcp";
+
+const client = new AtlasClient();
+
+// Ingest from base64 string
+const result = await client
+  .ingest()
+  .base64(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+    "png",
+  )
+  .filename("hero-banner.png")
+  .collection("Inspirations")
+  .tags(["ui", "banner", "mobile"])
+  .annotation("Header illustration for redesign")
+  .sourceUrl("https://example.com/banner.png")
+  .liked(true)
+  .send();
+
+console.log(`Ingested item ID: ${result.itemId}`);
 ```
 
 ---
@@ -169,7 +197,7 @@ await client.switchLibrary({ path: "/Users/username/Pictures/Work.atlaslibrary" 
 For fast, isolated testing without running the Atlas desktop application:
 
 ```typescript
-import { AtlasClient, MockAtlasTransport } from "@sora/atlas";
+import { AtlasClient, MockAtlasTransport } from "atlas-mcp";
 
 const mock = new MockAtlasTransport();
 const client = new AtlasClient({ transport: mock });

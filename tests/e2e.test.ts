@@ -185,4 +185,98 @@ describe("Atlas TypeScript SDK Live E2E Tests (Non-Destructive)", () => {
       }
     }
   });
+
+  // * ========================================================================
+  // * 4. Compound Ingestion Pipeline Verification (client.ingest())
+  // * ========================================================================
+  test("Compound Ingestion: one-shot base64 ingest with metadata and tags", async () => {
+    expect(isServerRunning).toBe(true);
+
+    let ingestedId: string | undefined;
+    try {
+      const res = await client
+        .ingest()
+        .base64(TINY_PNG_BASE64, "png")
+        .filename("ingest-e2e.png")
+        .tags(["ingest-tag"])
+        .annotation("ingest-note")
+        .sourceUrl("https://example.com")
+        .send();
+
+      expect(res.imported).toBe(true);
+      expect(res.itemId).toBeTruthy();
+      ingestedId = res.itemId;
+
+      // Verify item state in library
+      const detail = await client.getItem({ item_id: ingestedId });
+      expect(detail.id).toBe(ingestedId);
+      expect(detail.tags).toContain("ingest-tag");
+      expect(detail.annotation).toBe("ingest-note");
+      expect(detail.source_url).toBe("https://example.com");
+    } finally {
+      if (ingestedId) {
+        await client.trashItems({ item_ids: [ingestedId] });
+      }
+    }
+  });
+
+  // * ========================================================================
+  // * 5. Color Lifecycle Verification (add_color -> edit_color -> trash_items)
+  // * ========================================================================
+  test("Color Lifecycle: creates color swatch, mutates hex, and trashes cleanly", async () => {
+    expect(isServerRunning).toBe(true);
+
+    let colorId: string | undefined;
+    try {
+      const addRes = await client.addColor({ hex: "#FF5722" });
+      expect(addRes.ok).toBe(true);
+      expect(addRes.item_id).toBeTruthy();
+      colorId = addRes.item_id;
+
+      const editRes = await client.editColor({
+        item_id: colorId,
+        hex: "#00E5FF",
+      });
+      expect(editRes.ok).toBe(true);
+
+      const detail = await client.getItem({ item_id: colorId });
+      expect(detail.id).toBe(colorId);
+      expect(detail.hex).toBe("#00E5FF");
+    } finally {
+      if (colorId) {
+        await client.trashItems({ item_ids: [colorId] });
+      }
+    }
+  });
+
+  // * ========================================================================
+  // * 6. Link Lifecycle Verification (add_link -> edit_link -> trash_items)
+  // * ========================================================================
+  test("Link Lifecycle: creates web link, mutates title, and trashes cleanly", async () => {
+    expect(isServerRunning).toBe(true);
+
+    let linkId: string | undefined;
+    try {
+      const addRes = await client.addLink({
+        url: "https://atlasformac.com",
+      });
+      expect(addRes.ok).toBe(true);
+      expect(addRes.item_id).toBeTruthy();
+      linkId = addRes.item_id;
+
+      const editRes = await client.editLink({
+        item_id: linkId,
+        title: "Atlas Official Site Updated",
+      });
+      expect(editRes.id).toBe(linkId);
+
+      const detail = await client.getItem({ item_id: linkId });
+      expect(detail.id).toBe(linkId);
+      expect(detail.title || detail.name).toContain("Atlas");
+    } finally {
+      if (linkId) {
+        await client.trashItems({ item_ids: [linkId] });
+      }
+    }
+  });
 });

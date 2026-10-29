@@ -924,9 +924,12 @@ export interface EditLinkParams {
 
 export interface EditLinkResult {
   /** Whether the operation succeeded */
-  ok: boolean;
+  ok?: boolean;
   /** Link card item UUID */
-  item_id: string;
+  item_id?: string;
+  /** Returned link ID */
+  id?: string;
+  [key: string]: unknown;
 }
 
 // --- 25. edit_color ---

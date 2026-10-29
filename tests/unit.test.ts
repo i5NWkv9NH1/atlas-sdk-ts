@@ -429,7 +429,53 @@ describe("Atlas TypeScript SDK Unit Tests", () => {
   });
 
   // * ========================================================================
-  // * 8. Secret Leak Prevention Scan
+  // * 8. Compound Ingestion Builder (client.ingest())
+  // * ========================================================================
+  test("Compound Ingestion: client.ingest() coordinates import, tags, metadata, and cleanup", async () => {
+    const mock = new MockAtlasTransport();
+    let importedPath: string | undefined;
+
+    mock.mock("import_files", (args) => {
+      importedPath = (args.paths as string[])[0];
+      return { ok: true, item_ids: ["item-mock-ingest-123"] };
+    });
+    mock.mock("add_tags", (args) => ({ ok: true, added: (args.tags as string[]).length }));
+    mock.mock("set_metadata", () => ({ ok: true }));
+    mock.mock("set_liked", () => ({ ok: true, liked: true }));
+
+    const client = new AtlasClient({ transport: mock });
+    const bytes = new Uint8Array([1, 2, 3, 4]);
+
+    const result = await client
+      .ingest()
+      .bytes(bytes, "png")
+      .filename("custom-name.png")
+      .collection("Inbox")
+      .tags(["tag1", "tag2"])
+      .annotation("Sample note")
+      .sourceUrl("https://atlasformac.com")
+      .liked(true)
+      .send();
+
+    expect(result.itemId).toBe("item-mock-ingest-123");
+    expect(result.imported).toBe(true);
+
+    // Verify all tools were called in order
+    const calledNames = mock.callHistory.map((c) => c.name);
+    expect(calledNames).toContain("import_files");
+    expect(calledNames).toContain("add_tags");
+    expect(calledNames).toContain("set_metadata");
+    expect(calledNames).toContain("set_liked");
+
+    // Verify /tmp file was removed
+    expect(importedPath).toBeTruthy();
+    if (importedPath) {
+      expect(await Bun.file(importedPath).exists()).toBe(false);
+    }
+  });
+
+  // * ========================================================================
+  // * 9. Secret Leak Prevention Scan
   // * ========================================================================
   test("Secret Leak Prevention: scans src/ and tests/ for forbidden token leaks and runtime file violations", async () => {
     // Scan all .ts files in src/ and tests/

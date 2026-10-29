@@ -2,6 +2,7 @@
 // * Strongly-typed local MCP SDK for Atlas on macOS (Unofficial)
 
 export * from "./client.js";
+export * from "./ingest.js";
 export * from "./media.js";
 export * from "./normalize.js";
 export * from "./organize.js";

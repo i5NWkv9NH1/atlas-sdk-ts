@@ -1,6 +1,7 @@
 // * Primary Atlas Client Entry Point
 // * Aggregates domain modules and exposes strongly-typed methods for all 78 Atlas MCP tools.
 
+import { IngestBuilder } from "./ingest.js";
 import { MediaModule } from "./media.js";
 import { OrganizeModule } from "./organize.js";
 import { QueryModule } from "./query.js";
@@ -227,6 +228,13 @@ export class AtlasClient {
    */
   ping(): Promise<boolean> {
     return this.transport.ping();
+  }
+
+  /**
+   * Create a fluent, chainable builder for one-shot compound media ingestion.
+   */
+  ingest(): IngestBuilder {
+    return new IngestBuilder(this);
   }
 
   // * ========================================================================

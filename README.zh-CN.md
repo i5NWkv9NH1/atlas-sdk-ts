@@ -1,4 +1,4 @@
-# @sora/atlas
+# atlas-mcp
 
 [English](README.md) | [简体中文](README.zh-CN.md)
 
@@ -13,6 +13,7 @@ macOS 视觉素材管理软件 [**Atlas**](https://atlasformac.com/) 的本地 M
 ## 核心特性
 
 - **100% 覆盖官方工具**：完整实现官方 MCP Schema 中的全部 78 个工具并提供强类型保护。
+- **高阶链式一步入库**：提供 `client.ingest()` 构建器，支持通过二进制字节流、Base64 字符串、文件路径或网络 URL 一步完成媒体写入、分类归集、打标与元数据配置。
 - **双命名风格支持**：每个工具均同时支持 TS 惯用的驼峰命名（如 `client.searchItems(...)`）与协议原始的下划线命名（如 `client.search_items(...)`）。
 - **多图库 Token 自动切换**：支持自动读取图库目录下的 `.mcp-token`、支持从 `atlas status` 探测当前图库路径、并支持按图库路径配置独立密钥。
 - **断线自愈与静默唤醒**：当本地 Atlas 软件未启动时，通过 `open -g -a Atlas` 静默拉起应用并轮询等待服务可用；当遭遇 `HTTP 401` 时自动清空缓存重新探测 Token 并重试一次。
@@ -39,7 +40,7 @@ git clone https://github.com/i5NWkv9NH1/atlas-ts.git
 cd atlas-ts && bun install && bun link
 
 # 在你的目标项目中链接：
-bun link @sora/atlas
+bun link atlas-mcp
 ```
 
 ---
@@ -49,7 +50,7 @@ bun link @sora/atlas
 ### 1. 基础连接与检索
 
 ```typescript
-import { AtlasClient } from "@sora/atlas";
+import { AtlasClient } from "atlas-mcp";
 
 // 自动探测本地运行中图库的 Token 与端点（http://127.0.0.1:50473/mcp）
 const client = new AtlasClient();
@@ -93,6 +94,33 @@ const client = new AtlasClient({
 
 // 切换当前激活的图库
 await client.switchLibrary({ path: "/Users/username/Pictures/工作.atlaslibrary" });
+```
+
+### 3. 一步链式媒体入库（`client.ingest()`）
+
+通过链式调用一步完成图片或媒体的载入，支持二进制字节流、Base64 字符串、本地文件路径或网络媒体 URL，同时指定所属分类、标签、注释、来源与收藏状态，自动管理并清理临时文件：
+
+```typescript
+import { AtlasClient } from "atlas-mcp";
+
+const client = new AtlasClient();
+
+// 通过 Base64 字符串一步入库
+const result = await client
+  .ingest()
+  .base64(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+    "png",
+  )
+  .filename("hero-banner.png")
+  .collection("灵感收集")
+  .tags(["ui", "banner", "mobile"])
+  .annotation("改版首页横幅素材")
+  .sourceUrl("https://example.com/banner.png")
+  .liked(true)
+  .send();
+
+console.log(`入库成功，素材 ID: ${result.itemId}`);
 ```
 
 ---
@@ -169,7 +197,7 @@ await client.switchLibrary({ path: "/Users/username/Pictures/工作.atlaslibrary
 无需启动 Atlas 软件即可进行脱机单元测试：
 
 ```typescript
-import { AtlasClient, MockAtlasTransport } from "@sora/atlas";
+import { AtlasClient, MockAtlasTransport } from "atlas-mcp";
 
 const mock = new MockAtlasTransport();
 const client = new AtlasClient({ transport: mock });

@@ -470,7 +470,14 @@ export class HttpAtlasTransport implements AtlasTransport {
       this.tokenResolver.clearCache();
       const refreshedToken = await this.tokenResolver.resolveToken(true);
 
-      const retryRes = await this.executeRawRpc(method, params, refreshedToken);
+      let retryRes: Response;
+      try {
+        retryRes = await this.executeRawRpc(method, params, refreshedToken);
+      } catch (err) {
+        throw new AtlasConnectionError(
+          `Failed to connect to Atlas MCP server on retry at ${this.endpoint}: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
 
       if (retryRes.status === 401) {
         throw new AtlasAuthError(
@@ -482,17 +489,29 @@ export class HttpAtlasTransport implements AtlasTransport {
 
     // ! Handle other HTTP errors
     if (!response.ok) {
-      const errText = await response.text();
+      const errText = await response.text().catch(() => "");
       throw new AtlasError(`Atlas MCP HTTP error (status ${response.status}): ${errText}`);
     }
 
     // * Parse JSON-RPC 2.0 response wrapper
-    const json = (await response.json()) as {
+    let json: {
       jsonrpc: string;
       id: number;
       error?: { code: number; message: string; data?: unknown };
       result?: T;
     };
+    try {
+      json = (await response.json()) as {
+        jsonrpc: string;
+        id: number;
+        error?: { code: number; message: string; data?: unknown };
+        result?: T;
+      };
+    } catch (parseErr) {
+      throw new AtlasError(
+        `Failed to parse Atlas MCP JSON-RPC response: ${parseErr instanceof Error ? parseErr.message : String(parseErr)}`,
+      );
+    }
 
     // ! Check top-level JSON-RPC protocol error
     if (json.error) {
