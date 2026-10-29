@@ -1,0 +1,192 @@
+# @sora/atlas
+
+[English](README.md) | [简体中文](README.zh-CN.md)
+
+Official strongly-typed local Model Context Protocol (MCP) SDK for the macOS **Atlas** visual library application.
+
+Built for **Bun 1.4+** and **TypeScript 7+**, with zero external runtime dependencies.
+
+---
+
+## Highlights
+
+- **100% Tool Coverage**: Complete, type-safe implementations of all 78 tools from the official Atlas MCP schema.
+- **Dual Calling Convention**: Every tool is accessible via both idiomatic `camelCase` (`client.searchItems(...)`) and original `snake_case` (`client.search_items(...)`).
+- **Multi-Library Token Switching**: Automatically discovers `.mcp-token` from the active library, reads tokens via `atlas status`, and supports library-specific token routing.
+- **Fault-Tolerant Transport**: Automatic macOS background launch (`open -g -a Atlas`) on connection refusal and transparent single retry on `HTTP 401 Unauthorized`.
+- **Parameter Normalization**: Transparently handles MCP protocol quirks (such as requiring `""` for unset enum filters and `0` for numeric filters).
+- **Zero Runtime Dependencies**: Uses native `fetch`, `Bun.file`, and `Bun.spawnSync` exclusively.
+- **Offline Mock Transport**: Built-in `MockAtlasTransport` with argument recording for isolated unit testing.
+
+---
+
+## Installation
+
+```bash
+bun add @sora/atlas
+```
+
+Or link locally for workspace development:
+
+```bash
+cd atlas-ts
+bun link
+```
+
+---
+
+## Quick Start
+
+### 1. Basic Ingestion and Search
+
+```typescript
+import { AtlasClient } from "@sora/atlas";
+
+// Automatically discovers active token and endpoint (http://127.0.0.1:50473/mcp)
+const client = new AtlasClient();
+
+// Check server connectivity
+const isReady = await client.ping();
+console.log("Atlas MCP Server ready:", isReady);
+
+// Inspect active library
+const info = await client.libraryInfo();
+console.log(`Connected to library: ${info.name} (${info.unique_items} items)`);
+
+// Search items with metadata filters
+const searchResult = await client.searchItems({
+  query: "design system",
+  kind: "image",
+  limit: 20,
+});
+
+for (const item of searchResult.items) {
+  console.log(`Found [${item.id}] ${item.name} (${item.format})`);
+}
+```
+
+### 2. Multi-Library Token Configuration
+
+Each `.atlaslibrary` bundle on macOS maintains its own authorization key in `<library_path>/.mcp-token`. You can register specific tokens or rely on automatic discovery:
+
+```typescript
+const client = new AtlasClient({
+  // Fallback default token
+  token: process.env.ATLAS_MCP_TOKEN,
+  // Per-library tokens
+  libraryTokens: {
+    "/Users/username/Pictures/Work.atlaslibrary": "token_for_work",
+    "/Users/username/Pictures/Personal.atlaslibrary": "token_for_personal",
+  },
+  // Automatically discover token from disk when switching
+  autoDiscoverToken: true,
+});
+
+// Switch active library
+await client.switchLibrary({ path: "/Users/username/Pictures/Work.atlaslibrary" });
+```
+
+---
+
+## Domain Modules
+
+`AtlasClient` organizes tools into four logical domain namespaces while also exposing all 78 methods directly on the client instance:
+
+### `client.query` (Search & Retrieval)
+
+- `searchItems(params)` / `search_items`
+- `searchByDescription(params)` / `search_by_description`
+- `findSimilar(params)` / `find_similar`
+- `getItem(params)` / `get_item`
+- `viewItems(params)` / `view_items`
+- `getFile(params)` / `get_file`
+- `storeEmbeddings(params)` / `store_embeddings`
+- `queryEmbeddings(params)` / `query_embeddings`
+- `runSmartFolder(params)` / `run_smart_folder`
+- `getBoard(params)` / `get_board`
+- `getCurrentView(params)` / `get_current_view`
+
+### `client.media` (Ingestion & Mutation)
+
+- `importFiles(params)` / `import_files`
+- `addLink(params)` / `add_link`
+- `editLink(params)` / `edit_link`
+- `addColor(params)` / `add_color`
+- `editColor(params)` / `edit_color`
+- `saveMediaFromUrl(params)` / `save_media_from_url`
+- `editImage(params)` / `edit_image`
+- `refreshThumbnail(params)` / `refresh_thumbnail`
+- `setLiked(params)` / `set_liked`
+- `setMetadata(params)` / `set_metadata`
+- `trashItems(params)` / `trash_items`
+- `restoreItems(params)` / `restore_items`
+- `deletePermanently(params)` / `delete_permanently`
+- `emptyTrash(params)` / `empty_trash`
+
+### `client.organize` (Collections, Tags & Libraries)
+
+- **Collections**: `listCollections`, `createCollection`, `renameCollection`, `archiveCollection`, `deleteCollection`, `setCollectionOrder`, `addToCollection`, `removeFromCollection`
+- **Folders**: `listCollectionFolders`, `createCollectionFolder`, `moveCollectionFolder`, `renameCollectionFolder`, `deleteCollectionFolder`, `moveCollectionToFolder`
+- **Tags & Tag Folders**: `listTags`, `createTag`, `renameTag`, `deleteTag`, `addTags`, `removeTags`, `setTags`, `moveTagsToFolder`, `createTagFolder`, `renameTagFolder`, `deleteTagFolder`
+- **Smart Folders**: `listSmartFolders`, `createSmartFolder`, `updateSmartFolder`, `deleteSmartFolder`
+- **Canvas Board**: `arrangeBoard`, `moveToGroup`, `moveGroup`, `resetBoardLayout`, `undoBoardLayout`
+- **Connected Folders**: `listConnectedFolders`, `connectFolder`, `disconnectFolder`, `rescanFolder`
+- **Libraries**: `libraryInfo`, `listLibraries`, `createLibrary`, `switchLibrary`
+
+### `client.ui` (App UI & Settings)
+
+- `showInApp(params)` / `show_in_app`
+- `showItems(params)` / `show_items`
+- `openItem(params)` / `open_item`
+- `selectItems(params)` / `select_items`
+- `setViewMode(params)` / `set_view_mode`
+- `showInFinder(params)` / `show_in_finder`
+- `getSettings(params)` / `get_settings`
+- `setSetting(params)` / `set_setting`
+- `openSettings(params)` / `open_settings`
+- `appInfo(params)` / `app_info`
+- `runMaintenance(params)` / `run_maintenance`
+
+---
+
+## Offline Unit Testing with `MockAtlasTransport`
+
+For fast, isolated testing without running the Atlas desktop application:
+
+```typescript
+import { AtlasClient, MockAtlasTransport } from "@sora/atlas";
+
+const mock = new MockAtlasTransport();
+const client = new AtlasClient({ transport: mock });
+
+// Register handler
+mock.mockTool("add_color", (args) => ({
+  ok: true,
+  item_id: "test-color-id",
+  hex: args.hex,
+}));
+
+// Test method
+const result = await client.addColor({ hex: "#00E5FF" });
+console.assert(result.item_id === "test-color-id");
+console.assert(mock.callHistory[0].name === "add_color");
+```
+
+---
+
+## Quality Gates & Verification
+
+```bash
+# Type check with strict TypeScript 7
+bunx tsc --noEmit
+
+# Format and lint check with Biome
+bunx biome check .
+
+# Run unit tests and non-destructive live E2E tests
+bun test
+```
+
+## License
+
+MIT
