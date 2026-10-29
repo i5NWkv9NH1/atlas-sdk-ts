@@ -1,5 +1,5 @@
 // * Atlas SDK for TypeScript / Bun
-// * Official strongly-typed local MCP SDK for Atlas on macOS
+// * Strongly-typed local MCP SDK for Atlas on macOS (Unofficial)
 
 export * from "./client.js";
 export * from "./media.js";

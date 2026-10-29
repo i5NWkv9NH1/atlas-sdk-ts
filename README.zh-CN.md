@@ -4,7 +4,7 @@
 
 > **说明**：本 SDK 主要为个人自用封装。仓库中的绝大部分代码、工程规范与测试套件均由 **Gemini 3.8 Flash** 与 **Gemini 4 Argon** 生成。
 
-macOS 视觉素材管理软件 **Atlas** 的本地 MCP 客户端强类型 SDK。
+macOS 视觉素材管理软件 **Atlas** 的本地 MCP 客户端强类型 SDK（第三方非官方实现）。
 
 面向 **Bun 1.4+** 与 **TypeScript 7+** 开发，运行期零外部冗余依赖。
 
